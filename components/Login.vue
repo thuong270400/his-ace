@@ -99,7 +99,7 @@ export default {
             console.log("after axios 1");
             // this.posts = response.data;
             data = response;
-            if (data.data?.ToKen) {
+            if (data?.data?.ToKen) {
               console.log("data auth", data);
             } else {
               console.log("data login false", data);
@@ -148,7 +148,7 @@ export default {
           );
         }
         const headers = {
-          authentication: data.data?.ToKen,
+          authentication: data?.data?.ToKen,
         };
         await axios
           .get(`${useRuntimeConfig().public.DOMAIN}/auth`, {

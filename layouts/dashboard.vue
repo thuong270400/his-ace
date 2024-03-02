@@ -87,21 +87,25 @@ export default {
               id: 1,
               icon: null,
               title: "Trang chủ",
+              permission: ["admin", "LH", "KD", "KH"],
             },
             {
               id: 2,
               icon: null,
               title: "Quản lý khám bệnh",
+              permission: ["admin", "LH", "KD", "KH"],
             },
             {
               id: 3,
               icon: null,
               title: "Quản lý lịch khám",
+              permission: ["admin", "LH"],
             },
             {
               id: 4,
               icon: null,
               title: "Báo cáo",
+              permission: ["admin"],
             },
           ],
         },
@@ -120,7 +124,7 @@ export default {
               title: "Danh sách công ty",
               path: "/table_manage/companies",
               app_bar_id: 2,
-              permission: ["admin"],
+              permission: ["admin", "KH", "KD"],
             },
             {
               id: 3,
@@ -135,6 +139,7 @@ export default {
               title: "Danh sách bệnh nhân",
               path: "/table_manage/patients",
               app_bar_id: 2,
+              permission: ["admin", "KH", "KD"],
             },
             {
               id: 5,
@@ -142,6 +147,7 @@ export default {
               title: "Danh sách lịch hẹn",
               path: "/schedule_manage/examination_schedule",
               app_bar_id: 3,
+              permission: ["admin", "LH"],
             },
             {
               id: 6,
@@ -149,6 +155,7 @@ export default {
               title: "Số lượng khám thực",
               path: "/table_manage/real_examination",
               app_bar_id: 3,
+              permission: ["admin", "LH"],
             },
             {
               id: 7,
@@ -156,6 +163,7 @@ export default {
               title: "Báo cáo trong ngày",
               path: "/",
               app_bar_id: 4,
+              permission: ["admin"],
             },
           ],
         },
@@ -180,6 +188,7 @@ export default {
   async mounted() {
     await this.fetchLogin();
     await this.filtersStore.fetchUser();
+    this.fetListAppBar();
   },
   methods: {
     async fetchLogin() {
@@ -189,6 +198,17 @@ export default {
     },
     testLogin() {
       return this.store.state.isLogin;
+    },
+    fetListAppBar() {
+      this.layout.app_bar.items = this.layout.app_bar.items.filter((item) => {
+        for (const i of item.permission) {
+          if (this.store.data.user.permission === i) {
+            return true;
+          }
+        }
+        return false;
+      });
+      console.log("this.app_bar.items", this.layout.app_bar.items);
     },
     getListNavDraw(item) {
       this.layout.nav_draw_now.items = [];

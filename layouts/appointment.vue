@@ -168,7 +168,14 @@ export default {
   background-size: cover;
   background-repeat: no-repeat;
   background-attachment: fixed;
-  height: 100%;
+  height: auto;
   width: 100%;
+}
+
+.card_style {
+  display: flex;
+  border-radius: 0;
+  /* min-height: 100vh; */
+  /* margin-bottom: 3vw; */
 }
 </style>

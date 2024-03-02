@@ -22,7 +22,14 @@
           hide-details
         ></v-text-field>
       </v-col>
-      <v-col cols="auto" style="text-align: right">
+      <v-col
+        v-if="
+          store.data.user.permission === 'admin' ||
+          store.data.user.permission === 'KD'
+        "
+        cols="auto"
+        style="text-align: right"
+      >
         <v-btn color="primary" dark class="mb-2" @click="addCompany">
           Thêm công ty
         </v-btn>
@@ -81,22 +88,29 @@
       </div>
     </template>
     <template v-slot:item.actions="{ item }">
-      <v-tooltip text="Tạo gói khám">
-        <template v-slot:activator="{ props }">
-          <v-icon
-            v-bind="props"
-            size="small"
-            class="me-2"
-            @click="addPackage(item)"
-          >
-            mdi-medical-bag
-          </v-icon>
-        </template>
-      </v-tooltip>
-      <v-icon size="small" class="me-2" @click="editItem(item)">
-        mdi-pencil
-      </v-icon>
-      <v-icon size="small" @click="deleteItem(item)"> mdi-delete </v-icon>
+      <span
+        v-if="
+          store.data.user.permission === 'admin' ||
+          store.data.user.permission === 'KD'
+        "
+      >
+        <v-tooltip text="Tạo gói khám">
+          <template v-slot:activator="{ props }">
+            <v-icon
+              v-bind="props"
+              size="small"
+              class="me-2"
+              @click="addPackage(item)"
+            >
+              mdi-medical-bag
+            </v-icon>
+          </template>
+        </v-tooltip>
+        <v-icon size="small" class="me-2" @click="editItem(item)">
+          mdi-pencil
+        </v-icon>
+        <v-icon size="small" @click="deleteItem(item)"> mdi-delete </v-icon>
+      </span>
     </template>
     <template v-slot:no-data>
       <v-btn color="primary" @click="initialize"> Reset </v-btn>
@@ -138,7 +152,7 @@
                 v-model="editedItem.phone_number"
                 :rules="phoneNumberRule"
                 color="blue"
-                maxlength="10"
+                maxlength="11"
                 label="Số điện thoại"
                 variant="outlined"
               ></v-text-field>
@@ -172,7 +186,7 @@
                 v-model="editedItem.company_contacts[0].phone_number"
                 :rules="phoneNumberRule"
                 color="blue"
-                maxlength="10"
+                maxlength="11"
                 label="Số điện thoại người liên hệ"
                 variant="outlined"
               ></v-text-field>
@@ -275,6 +289,8 @@
                 :rules="[numberRule]"
                 label="Giá trị gói khám"
                 variant="outlined"
+                @focus="followKSKPrice"
+                @blur="blurKSKPrice"
               ></v-text-field>
             </v-col>
             <v-col class="col-edit" cols="12" sm="6" md="4">
@@ -283,6 +299,8 @@
                 :rules="[numberRule]"
                 label="Số lượng nhân viên"
                 variant="outlined"
+                @focus="followKSKAmount"
+                @blur="blurKSKAmount"
               ></v-text-field>
             </v-col>
           </v-row>
@@ -294,9 +312,51 @@
         <v-btn color="blue-darken-1" variant="text" @click="closeDialogPackage">
           Đóng
         </v-btn>
-        <v-btn color="blue-darken-1" variant="text" @click="createPackage()">
+        <!-- <v-btn color="blue-darken-1" variant="text" @click="createPackage()">
+          Khởi tạo
+        </v-btn> -->
+        <v-btn
+          color="blue-darken-1"
+          variant="text"
+          @click="dialogCreatePackageSchedule = true"
+        >
           Khởi tạo
         </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- Dialog xác nhận khởi tạo gói khám -->
+  <v-dialog
+    width="auto"
+    v-model="dialogCreatePackageSchedule"
+    class="schedule_dialog"
+  >
+    <v-card>
+      <v-card-title align="center">
+        Xác nhận thêm gói khám&nbsp;<b>{{ store.data.packageAdd.name }}</b
+        >&nbsp;vào dữ liệu?
+      </v-card-title>
+      <v-card-actions>
+        <v-spacer></v-spacer>
+        <v-btn
+          color="blue-darken-1"
+          variant="text"
+          @click="dialogCreatePackageSchedule = false"
+        >
+          Hủy
+        </v-btn>
+
+        <v-spacer></v-spacer>
+
+        <v-btn
+          color="blue-darken-1"
+          variant="text"
+          @click="checkBeforeCreatePack()"
+        >
+          Xác nhận
+        </v-btn>
+        <v-spacer></v-spacer>
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -354,6 +414,8 @@ export default {
       dialog: false,
       dialogDelete: false,
       dialogPackage: false,
+      dialogCreatePackageSchedule: false,
+
       display_style: "none",
 
       store: storeToRefs(useFiltersStore()),
@@ -463,10 +525,10 @@ export default {
         (v) => {
           if (v) {
             if (/^[Z0-9-()]+(\s+[Z0-9-()]+)*$/.test(v)) {
-              if (v[0] === "0" && v.length === 10) {
+              if (v[0] === "0" && v.length === 11) {
                 return true;
               }
-              return "sdt phải có 10 số. Vd: 0701234567";
+              return "sdt phải có 10 số. Vd: 07012345678";
             } else {
               return "Không được có khoảng trắng và kí tự";
             }
@@ -495,15 +557,23 @@ export default {
 
   async mounted() {
     this.store.state.isManageSchedule = false;
-    console.log("load lại companies_");
-    if (this.store.state.isLogin) {
+    if (this.store.data.user.permission) {
       await this.fetchFirstData();
     }
   },
   watch: {
-    async "store.state.isLogin"(newValue, oldValue) {
-      console.log("oldValue", oldValue, "and NewValue", newValue);
-      if (this.store.state.isLogin) {
+    // async "store.state.isLogin"(newValue, oldValue) {
+    //   console.log("oldValue", oldValue, "and NewValue2", newValue);
+    //   if (this.store.state.isLogin === true) {
+    //     console.log("load lại companies_");
+    //     await this.fetchFirstData();
+    //   }
+    //   console.log("store.state.isLogin", this.store.state.isLogin);
+    // },
+
+    async "store.data.user.permission"(newVal, oldVal) {
+      if (newVal) {
+        console.log("load lại companies_ theo permission");
         await this.fetchFirstData();
       }
     },
@@ -532,34 +602,161 @@ export default {
     },
   },
   methods: {
+    async checkBeforeCreatePack() {
+      this.store.state.snackbar.variant = "flat";
+      this.store.state.snackbar.color_text = "#5f9431";
+      this.store.state.snackbar.color_close = "white";
+      this.store.state.snackbar.timeout = 3000;
+
+      if (!this.store.data.packageAdd.name) {
+        console.log(this.store.state);
+        this.store.state.snackbar.text = "Tên gói khám không được để trống!";
+        this.store.state.snackbar.state = true;
+      } else if (
+        !this.store.data.packageAdd.register_year ||
+        Number(this.store.data.packageAdd.register_year) <
+          new Date().getFullYear()
+      ) {
+        this.store.state.snackbar.text =
+          "Năm đăng ký phải lớn hơn hoặc bằng năm hiện tại!";
+        this.store.state.snackbar.state = true;
+      } else if (!this.store.data.packageAdd.price) {
+        this.store.state.snackbar.text =
+          "Giá trị gói khám không được để trống!";
+        this.store.state.snackbar.state = true;
+      } else if (!Number.isInteger(Number(this.store.data.packageAdd.price))) {
+        this.store.state.snackbar.text = "Giá trị gói khám phải là số!";
+        this.store.state.snackbar.state = true;
+      } else if (Number(this.store.data.packageAdd.price) <= 0) {
+        this.store.state.snackbar.text = "Giá trị gói khám phải lớn hơn 0!";
+        this.store.state.snackbar.state = true;
+      } else if (!this.store.data.packageAdd.number_of_employees) {
+        this.store.state.snackbar.text =
+          "Số lượng nhân viên không được để trống!";
+        this.store.state.snackbar.state = true;
+      } else if (
+        !Number.isInteger(
+          Number(this.store.data.packageAdd.number_of_employees)
+        )
+      ) {
+        this.store.state.snackbar.text = "Số lượng nhân viên phải là số!";
+        this.store.state.snackbar.state = true;
+      } else if (Number(this.store.data.packageAdd.number_of_employees) <= 0) {
+        this.store.state.snackbar.text = "Số lượng nhân viên phải lớn hơn 0!";
+        this.store.state.snackbar.state = true;
+      }
+      // Thỏa điều kiện
+      else {
+        await this.filtersStore.createPackageSchedule();
+        this.dialogCreatePackageSchedule = false;
+        this.dialogPackage = false;
+      }
+    },
+    followKSKPrice() {
+      if (!this.store.data.packageAdd.price) {
+        this.store.data.packageAdd.price = null;
+      }
+    },
+    blurKSKPrice() {
+      if (!this.store.data.packageAdd.price) {
+        this.store.data.packageAdd.price = 0;
+      }
+    },
+    followKSKAmount() {
+      if (!this.store.data.packageAdd.number_of_employees) {
+        this.store.data.packageAdd.number_of_employees = null;
+      }
+    },
+    blurKSKAmount() {
+      if (!this.store.data.packageAdd.number_of_employees) {
+        this.store.data.packageAdd.number_of_employees = 0;
+      }
+    },
+    fetchHeader() {
+      if (
+        this.store.data.user.permission !== "admin" &&
+        this.store.data.user.permission !== "KD"
+      ) {
+        console.log("true");
+        this.headers = this.headers.filter(
+          (header) => header.key !== "actions"
+        );
+        console.log(this.headers);
+      }
+    },
     async fetchFirstData() {
+      console.log("fetch đây");
+      this.fetchHeader();
       this.fetching = true;
       this.store.state.progress_circular.state = true;
       this.store.state.progress_circular.icon = "mdi-domain";
-      await axios
-        .get(`${useRuntimeConfig().public.DOMAIN}/select-companies`, {
-          params: {
-            internal_hospital_id: localStorage.getItem("internal_hospital_id"),
-          },
-        })
-        .then(async (response) => {
-          console.log("response.data", response?.data?.his_ace_companies);
-          // this.posts = response.data;
-          if (response?.data?.his_ace_companies) {
-            this.companies_ = response?.data?.his_ace_companies;
-            console.log("companies_data_", this.companies_);
-          }
-          if (this.companies_ && this.companies_.length > 0) {
-            let stt = 0;
-            for (let index = 0; index < this.companies_.length; index++) {
-              this.companies_[index].stt = ++stt;
-              await this.getImageData(this.companies_[index].id, index);
+      const headers = {
+        authentication: localStorage.getItem("loginToken")
+          ? localStorage.getItem("loginToken")
+          : "",
+      };
+      if (
+        this.store.data.user.permission === "admin" ||
+        this.store.data.user.permission === "KD"
+      ) {
+        console.log("gửi axios");
+        await axios
+          .get(`${useRuntimeConfig().public.DOMAIN}/select-companies`, {
+            params: {
+              internal_hospital_id: localStorage.getItem(
+                "internal_hospital_id"
+              ),
+              headers,
+            },
+          })
+          .then(async (response) => {
+            console.log("response.data", response?.data?.his_ace_companies);
+            // this.posts = response.data;
+            if (response?.data?.his_ace_companies) {
+              this.companies_ = response?.data?.his_ace_companies;
+              console.log("companies_data_", this.companies_);
             }
-          }
-        })
-        .catch((e) => {
-          console.log("không có data", e);
-        });
+            if (this.companies_ && this.companies_.length > 0) {
+              let stt = 0;
+              for (let index = 0; index < this.companies_.length; index++) {
+                this.companies_[index].stt = ++stt;
+                await this.getImageData(this.companies_[index].id, index);
+              }
+            }
+          })
+          .catch((e) => {
+            console.log("không có data", e);
+          });
+      } else if (this.store.data.user.permission === "KH") {
+        await axios
+          .get(`${useRuntimeConfig().public.DOMAIN}/select-client-companies`, {
+            params: {
+              internal_hospital_id: localStorage.getItem(
+                "internal_hospital_id"
+              ),
+              headers,
+            },
+          })
+          .then(async (response) => {
+            console.log("response.data", response?.data?.his_ace_companies);
+            // this.posts = response.data;
+            if (response?.data?.his_ace_companies) {
+              this.companies_ = response?.data?.his_ace_companies;
+              console.log("companies_data_", this.companies_);
+            }
+            if (this.companies_ && this.companies_.length > 0) {
+              let stt = 0;
+              for (let index = 0; index < this.companies_.length; index++) {
+                this.companies_[index].stt = ++stt;
+                await this.getImageData(this.companies_[index].id, index);
+              }
+            }
+          })
+          .catch((e) => {
+            console.log("không có data", e);
+          });
+      }
+
       this.store.state.progress_circular.state = false;
       this.store.state.progress_circular.icon = "";
 
@@ -638,7 +835,9 @@ export default {
                     tempEvent.extendedProps.appointment_session_id =
                       cloneSessions[j].id;
                     if (cloneSessions[j].name) {
-                      tempEvent.title = `Buổi ${cloneSessions[j].name}`;
+                      tempEvent.title = `Ca ${j + 1} | ${
+                        this.store.data.shift[j].time
+                      } \t|\t `;
                       tempEvent.extendedProps.session_name =
                         cloneSessions[j].name;
                     }

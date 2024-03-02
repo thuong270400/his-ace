@@ -3,7 +3,14 @@
     <v-card-title>
       <v-row>
         <!-- Khởi tạo gói khám -->
-        <v-col v-if="store.state.isCreatePackage" style="text-align: right">
+        <v-col
+          v-if="
+            store.state.isCreatePackage &&
+            (store.data.user.permission === 'admin' ||
+              store.data.user.permission === 'KD')
+          "
+          style="text-align: right"
+        >
           <v-tooltip text="Xác nhận khởi tạo gói khám" location="top">
             <template v-slot:activator="{ props }">
               <v-btn
@@ -12,12 +19,22 @@
                 size="large"
                 class="btn_add_schedule"
                 @click="dialogCreatePakageSchedule = true"
-              ></v-btn> </template
-          ></v-tooltip>
+              >
+              </v-btn>
+            </template>
+          </v-tooltip>
         </v-col>
 
         <!-- Cập nhật gói khám -->
-        <v-col v-if="store.state.isEditPackage" style="text-align: right">
+        <v-col
+          v-if="
+            store.state.isEditPackage &&
+            (store.data.user.permission === 'admin' ||
+              store.data.user.permission === 'KD' ||
+              store.data.user.permission === 'LH')
+          "
+          style="text-align: right"
+        >
           <v-tooltip text="Cập nhật gói khám" location="top">
             <template v-slot:activator="{ props }">
               <v-btn
@@ -33,7 +50,8 @@
         <v-col
           style="text-align: right"
           v-if="
-            store.data.user.permission === 'admin' &&
+            (store.data.user.permission === 'admin' ||
+              store.data.user.permission === 'LH') &&
             store.state.isManageSchedule
           "
         >
@@ -133,7 +151,7 @@
   <v-dialog v-model="dialogCreatePakageSchedule" class="schedule_dialog">
     <v-card>
       <v-card-title align="center">
-        Xác nhận thêm gói khám&nbsp;<b>{{ store.data.packageAdd.name }}</b
+        Xác nhận thêm lịch khám của gói&nbsp;<b>{{ store.data.packageAdd.name }}</b
         >&nbsp;vào dữ liệu?
       </v-card-title>
       <v-card-actions>
@@ -192,7 +210,7 @@
     <v-card>
       <v-card-text>
         <v-row justify="center" style="text-align: center">
-          Xác nhận cập nhật gói khám
+          Xác nhận cập nhật lịch gói khám
         </v-row>
       </v-card-text>
       <v-card-actions>
@@ -349,8 +367,12 @@ const calendarOptions = {
       }
       if (arg?.event?._def?.ui?.backgroundColor !== "red") {
         console.log(`còn slot`);
-        if (arg.event._def.extendedProps?.id) {
+        if (
+          arg.event._def.extendedProps?.id ||
+          arg.event._def.extendedProps?.id === 0
+        ) {
           tempEventEdit_id.value = arg.event._def.extendedProps.id;
+          console.log("tempEventEdit_id.value", tempEventEdit_id.value);
         }
         if (arg.event._def.extendedProps?.appointment_session_id) {
           tempAppointmentSessionEdit_id.value =
@@ -367,11 +389,14 @@ const calendarOptions = {
           store.value.data.scheduleEvents[tempEventEdit_id.value]?.extendedProps
             .session_slot
         );
+        console.log("session_slot", session_slot);
         const slot_registered = Number(
           store.value.data.scheduleEvents[tempEventEdit_id.value]?.extendedProps
             .slot_registered
         );
+        console.log("slot_registered", slot_registered);
         empty_slots.value = session_slot - slot_registered;
+        console.log("empty_slots.value", empty_slots.value);
         if (empty_slots.value > old_available_patients.value) {
           isBigerEmptySlot.value = true;
         } else {
@@ -495,28 +520,28 @@ const handleFileChange = (event) => {
           if (sheetData[index]["Date"]) {
             tempSchedule.date = sheetData[index]["Date"];
           }
-          if (sheetData[index]["7:30 am - 9:30 am"]) {
+          if (sheetData[index]["7:30 am - 9:00 am"]) {
             tempSchedule.appointment_sessions.data.push({
               name: "1",
-              total_slot: sheetData[index]["7:30 am - 9:30 am"],
+              total_slot: sheetData[index]["7:30 am - 9:00 am"],
             });
           }
-          if (sheetData[index]["9:30 am - 11:15 am"]) {
+          if (sheetData[index]["9:00 am - 10:30 am"]) {
             tempSchedule.appointment_sessions.data.push({
               name: "2",
-              total_slot: sheetData[index]["9:30 am - 11:15 am"],
+              total_slot: sheetData[index]["9:00 am - 10:30 am"],
             });
           }
-          if (sheetData[index]["1:00 pm - 3:00 pm"]) {
+          if (sheetData[index]["1:00 pm - 2:00 pm"]) {
             tempSchedule.appointment_sessions.data.push({
               name: "3",
-              total_slot: sheetData[index]["1:00 pm - 3:00 pm"],
+              total_slot: sheetData[index]["1:00 pm - 2:00 pm"],
             });
           }
-          if (sheetData[index]["3:00 pm - 4:30 pm"]) {
+          if (sheetData[index]["2:00 pm - 3:30 pm"]) {
             tempSchedule.appointment_sessions.data.push({
               name: "4",
-              total_slot: sheetData[index]["3:00 pm - 4:30 pm"],
+              total_slot: sheetData[index]["2:00 pm - 3:30 pm"],
             });
           }
           schedule_insert_.value.push(tempSchedule);
@@ -734,6 +759,7 @@ const findTempDeleteSessionPack = (session_id) => {
   };
   if (tempDeleteSessionPacks?.length > 0) {
     tempDeleteSessionPacks.forEach((obj) => {
+      console.log("obj.appointment_session_id", obj.appointment_session_id);
       if (obj.appointment_session_id.toString() === session_id.toString()) {
         console.log(
           "obj.appointment_session_id.toString() === session_id.toString()",
@@ -748,7 +774,7 @@ const findTempDeleteSessionPack = (session_id) => {
 };
 // lưu gói khám và lịch khám
 const save = async () => {
-  console.log("checkNumber", checkNumber(Number(register_patients.value)));
+  // console.log("checkNumber", checkNumber(Number(register_patients.value)));
   if (
     !Number.isInteger(Number(register_patients.value)) ||
     Number(register_patients.value) <= 0
@@ -764,6 +790,10 @@ const save = async () => {
     let isExistSessionID = false;
     if (store.value.data.packageAdd?.session_packs?.length > 0) {
       console.log("đã thêm trước đó!");
+      console.log(
+        "packageAdd.session_packs",
+        store.value.data.packageAdd.session_packs
+      );
       for (
         let index = 0;
         index < store.value.data.packageAdd.session_packs.length;
@@ -772,42 +802,62 @@ const save = async () => {
         const tempDataSSP = store.value.data.packageAdd.session_packs[index];
         const tempDataScheduleEvents =
           store.value.data.scheduleEvents[tempEventEdit_id.value];
+        console.log(
+          "tempDataScheduleEvents?.extendedProps?.appointment_session_id?.toString()",
+          tempDataScheduleEvents?.extendedProps?.appointment_session_id?.toString()
+        );
+        console.log(
+          `findTempDeleteSessionPack(
+            tempDataScheduleEvents?.extendedProps?.appointment_session_id
+          )?.appointment_session_id?.toString()`,
+          findTempDeleteSessionPack(
+            tempDataScheduleEvents?.extendedProps?.appointment_session_id
+          )?.appointment_session_id?.toString()
+        );
         if (
           tempDataSSP.appointment_session_id?.toString() ===
           tempDataScheduleEvents.extendedProps?.appointment_session_id?.toString()
         ) {
           if (tempDataSSP?.total_slot) {
+            // if (
+            //   tempDataScheduleEvents?.extendedProps?.appointment_session_id?.toString() ===
+            //   findTempDeleteSessionPack(
+            //     tempDataScheduleEvents?.extendedProps?.appointment_session_id
+            //   )?.appointment_session_id?.toString()
+            // ) {
+            //   const findTempDelete = findTempDeleteSessionPack(
+            //     tempDataScheduleEvents?.extendedProps?.appointment_session_id
+            //   );
+            //   tempSessionPack.value.id = findTempDelete.id
+            //     ? findTempDelete.id
+            //     : null;
+            //   console.log("findTempDelete", findTempDelete);
+            //   console.log("findTempDelete.is_exist", findTempDelete.is_exist);
+            //   tempSessionPack.value.is_exist = findTempDelete.is_exist
+            //     ? findTempDelete.is_exist
+            //     : null;
+            //   console.log("tempSessionPack", tempSessionPack);
+            //   store.value.data.packageAdd.session_packs.push(
+            //     tempSessionPack.value
+            //   );
+
+            //   store.value.data.tempDeleteSessionPacks =
+            //     store.value.data.tempDeleteSessionPacks.filter(
+            //       (temp) =>
+            //         temp.appointment_session_id !==
+            //         findTempDelete.appointment_session_id
+            //     );
+            //   isExistSessionID = true;
+            // } else {
+            console.log(
+              "chạy vô cộng lặp",
+              store.value.data.packageAdd.session_packs[index].total_slot
+            );
             store.value.data.packageAdd.session_packs[index].total_slot +=
               tempSessionPack.value.total_slot;
             isExistSessionID = true;
+            // }
           }
-        } else if (
-          tempDataScheduleEvents?.extendedProps?.appointment_session_id?.toString() ===
-          findTempDeleteSessionPack(
-            tempDataScheduleEvents?.extendedProps?.appointment_session_id
-          )?.appointment_session_id?.toString()
-        ) {
-          const findTempDelete = findTempDeleteSessionPack(
-            tempDataScheduleEvents?.extendedProps?.appointment_session_id
-          );
-          tempSessionPack.value.id = findTempDelete.id
-            ? findTempDelete.id
-            : null;
-          console.log("findTempDelete", findTempDelete);
-          console.log("findTempDelete.is_exist", findTempDelete.is_exist);
-          tempSessionPack.value.is_exist = findTempDelete.is_exist
-            ? findTempDelete.is_exist
-            : null;
-          console.log("tempSessionPack", tempSessionPack);
-          store.value.data.packageAdd.session_packs.push(tempSessionPack.value);
-
-          store.value.data.tempDeleteSessionPacks =
-            store.value.data.tempDeleteSessionPacks.filter(
-              (temp) =>
-                temp.appointment_session_id !==
-                findTempDelete.appointment_session_id
-            );
-          isExistSessionID = true;
         }
       }
     }

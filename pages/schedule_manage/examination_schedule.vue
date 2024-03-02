@@ -22,8 +22,8 @@
 import axios from "axios";
 import { useFiltersStore } from "~/store/index.ts";
 import { storeToRefs } from "pinia";
-import Calendar from "../components/time_manage/Calendar.vue";
-import SnackBar from "../components/utilities/SnackBar.vue";
+import Calendar from "~/components/time_manage/Calendar.vue";
+import SnackBar from "~/components/utilities/Snackbar.vue";
 import ProgressCircular from "~/components/utilities/ProgressCircular.vue";
 import SingleProgressCircular from "~/components/utilities/SingleProgressCircular.vue";
 export default defineComponent({

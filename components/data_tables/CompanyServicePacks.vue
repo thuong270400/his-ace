@@ -32,12 +32,16 @@
         ></v-text-field>
       </v-col>
       <v-col
-        v-if="store.data.user.permission === 'admin' && !is_browse_packs"
+        v-if="
+          (store.data.user.permission === 'admin' ||
+            store.data.user.permission === 'LH') &&
+          !is_browse_packs
+        "
         cols="auto"
         style="text-align: right"
       >
         <v-btn color="primary" dark class="mb-2" @click="browsePacks">
-          Duyệt gói khám
+          Duyệt lịch khám
         </v-btn>
       </v-col>
     </v-row>
@@ -85,6 +89,48 @@
         ><br />
       </div>
     </template>
+
+    <!-- Trạng thái gói khám -->
+    <template v-slot:item.status="{ item }">
+      <div>
+        <span
+          v-if="item.is_accepted === 1"
+          style="
+            background-color: lightskyblue;
+            color: white;
+            border-radius: 7px;
+            padding: 3.5px;
+            border: 1px solid #98e055;
+          "
+        >
+          Đang chờ
+        </span>
+        <span
+          v-if="item.is_accepted === 2"
+          style="
+            background-color: gray;
+            color: white;
+            border-radius: 7px;
+            padding: 3.5px;
+            border: 1px solid #98e055;
+          "
+        >
+          Đã đóng
+        </span>
+        <span
+          v-if="item.is_accepted === 3"
+          style="
+            background-color: #98e055;
+            color: white;
+            border-radius: 7px;
+            padding: 3.5px;
+            border: 1px solid #98e055;
+          "
+        >
+          Đã duyệt
+        </span>
+      </div>
+    </template>
     <template v-slot:item.actions="{ item }">
       <input
         type="file"
@@ -109,7 +155,10 @@
           </v-icon>
         </template>
       </v-tooltip>
-      <v-tooltip v-else text="Gửi danh sách người khám">
+      <v-tooltip
+        v-else-if="item.is_accepted === 3"
+        text="Gửi danh sách người khám"
+      >
         <template v-slot:activator="{ props }">
           <v-icon
             v-bind="props"
@@ -178,7 +227,7 @@
   <v-dialog v-model="dialogDelete" width="auto">
     <v-card>
       <v-card-title style="text-align: center; color: #4da1eb">
-        XÓA CÔNG TY
+        XÓA GÓI KHÁM
       </v-card-title>
       <v-card-text class="text-h7">
         <v-row justify="center" style="text-align: center">
@@ -335,6 +384,19 @@
       </div>
     </v-card>
   </v-dialog>
+  <v-dialog v-model="dialogLinkList">
+    <v-card>
+      <v-card-text>
+        <span v-for="(item, i) in short_urls" :key="i"> {{ item }}<br /></span>
+        <br />
+        <v-divider></v-divider>
+        <br />
+        <span v-for="(item, i) in original_urls" :key="i">
+          {{ item }}<br />
+        </span>
+      </v-card-text>
+    </v-card>
+  </v-dialog>
 
   <Snackbar />
   <ProgressCircular />
@@ -375,11 +437,16 @@ export default {
   data: () => ({
     // --base variable
     // dialog display
+
     dialog: false,
     dialogDelete: false,
     dialogPackage: false,
     dialogImport: false,
     dialogEdit: false,
+    dialogLinkList: false,
+
+    short_urls: [],
+    original_urls: [],
     expanded: [],
 
     // loader
@@ -426,6 +493,7 @@ export default {
       { key: "price", title: "Giá gói khám" },
       { key: "register_year", title: "Năm" },
       { key: "schedules", title: "Lịch khám" },
+      { key: "status", title: "Trạng thái" },
       { title: "Actions", key: "actions", sortable: false },
     ],
     packages_: [
@@ -505,7 +573,7 @@ export default {
     patient_: [
       {
         fullname: "",
-        phong_number: "",
+        phone_number: "",
         birthday: "",
         email: "",
         appointment_date: "",
@@ -527,15 +595,29 @@ export default {
   }),
 
   async mounted() {
-    if (this.store.state.isLogin) {
+    if (this.store.data.user.permission) {
       await this.fetchFirstData();
     }
   },
 
   watch: {
-    async "store.state.isLogin"() {
-      if (this.store.state.isLogin) {
+    // async "store.state.isLogin"() {
+    //   if (this.store.state.isLogin) {
+    //     await this.fetchFirstData();
+    //   }
+    // },
+
+    async "store.data.user.permission"(newVal, oldVal) {
+      if (newVal) {
+        console.log("load lại pack_ theo permission");
         await this.fetchFirstData();
+      }
+    },
+
+    async "store.state.isReFetch"(newVal, oldVal) {
+      if (newVal === true) {
+        await this.fetchFirstData();
+        this.store.state.isReFetch = false;
       }
     },
 
@@ -566,7 +648,24 @@ export default {
     },
   },
   methods: {
+    initialize() {
+      this.fetchFirstData();
+    },
+
+    fetchHeader() {
+      if (
+        this.store.data.user.permission !== "admin" &&
+        this.store.data.user.permission !== "KD"
+      ) {
+        console.log("true");
+        this.headers = this.headers.filter(
+          (header) => header.key !== "actions" && header.key !== "price"
+        );
+        console.log(this.headers);
+      }
+    },
     async fetchFirstData() {
+      this.fetchHeader();
       this.fetching = true;
       this.circle_loader.icon = "mdi-medical-bag";
       this.circle_loader.state = true;
@@ -581,8 +680,12 @@ export default {
           .catch((e) => {
             console.log("không có data", e);
           });
-      } else if (this.store.data.user.permission === "admin") {
-        console.log("admin packs");
+      } else if (
+        this.store.data.user.permission === "admin" ||
+        this.store.data.user.permission === "LH" ||
+        this.store.data.user.permission === "KD"
+      ) {
+        // console.log("admin packs");
         response = await axios
           .get(
             `${useRuntimeConfig().public.DOMAIN}/select-company-service-packs`
@@ -590,8 +693,8 @@ export default {
           .catch((e) => {
             console.log("không có data", e);
           });
-      } else if (this.store.data.user.permission === "manager") {
-        console.log("manager packs");
+      } else if (this.store.data.user.permission === "KH") {
+        // console.log("manager packs");
         response = await axios
           .get(
             `${
@@ -610,7 +713,7 @@ export default {
       if (response) {
         if (response?.data?.his_ace_company_service_packs) {
           this.packages_ = response?.data?.his_ace_company_service_packs;
-          console.log("packages_data_", this.packages_);
+          console.log("response?.data", response?.data);
         }
         if (this.packages_ && this.packages_.length > 0) {
           let stt = 0;
@@ -628,12 +731,12 @@ export default {
 
     async fetchAppointment(item) {
       this.fetching = true;
-      console.log("item", item);
+      // console.log("item", item);
       this.store.data.packageAdd = item;
       this.store.data.packageAdd.session_packs = [];
       this.store.data.packageAdd.real_num_available =
         this.store.data.packageAdd.number_of_employees;
-      console.log("this.store.data.packageAdd", this.store.data.packageAdd);
+      // console.log("this.store.data.packageAdd", this.store.data.packageAdd);
       this.circle_loader.state = true;
       this.circle_loader.icon = "mdi-calendar-today";
       try {
@@ -655,10 +758,10 @@ export default {
             }
           )
           .then(async (response) => {
-            console.log(
-              "response.data",
-              response?.data?.his_ace_appointment_schedules
-            );
+            // console.log(
+            //   "response.data",
+            //   response?.data?.his_ace_appointment_schedules
+            // );
 
             // console.log(
             //   "store scheduleEvents first",
@@ -756,7 +859,7 @@ export default {
                         ) {
                           // tempEvent.extendedProps.register_patients_add = this.store.data.packageAdd.session_packs
 
-                          console.log("obj", obj);
+                          // console.log("obj", obj);
                           this.store.data.packageAdd.session_packs.push({
                             id: obj.id,
                             is_exist: true,
@@ -770,18 +873,18 @@ export default {
                           this.store.data.packageAdd.real_num_available -=
                             tempEvent.extendedProps.register_patients_add;
 
-                          console.log(
-                            "cloneSessions[j].id",
-                            cloneSessions[j].id,
-                            "totalSlots",
-                            totalSlots
-                          );
+                          // console.log(
+                          //   "cloneSessions[j].id",
+                          //   cloneSessions[j].id,
+                          //   "totalSlots",
+                          //   totalSlots
+                          // );
                           tempEvent.extendedProps.is_edit = true;
                           if (
                             totalSlots === Number(cloneSessions[j].total_slot)
                           ) {
                             tempEvent.backgroundColor = "orange";
-                            console.log("change orange");
+                            // console.log("change orange");
                           } else {
                             tempEvent.backgroundColor = "#68cd00";
                           }
@@ -836,7 +939,7 @@ export default {
         selectedFile.type ===
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       ) {
-        console.log("Selected CSV File:", selectedFile);
+        // console.log("Selected CSV File:", selectedFile);
         this.selectedFileName = selectedFile.name;
         // Thực hiện các xử lý khác dựa trên file CSV đã chọn
         const reader = new FileReader();
@@ -849,7 +952,7 @@ export default {
             workbook.Sheets[sheetName]
           );
 
-          console.log("Sheet Data:", sheetData);
+          // console.log("Sheet Data:", sheetData);
 
           // Thực hiện các xử lý khác dựa trên dữ liệu từ file XLSX đã chọn
           if (sheetData) {
@@ -857,7 +960,7 @@ export default {
             for (let index = 0; index < sheetData.length; index++) {
               const tempPatient = {
                 fullname: "",
-                phong_number: "",
+                phone_number: "",
                 birthday: "",
                 email: "",
                 appointment_date: "",
@@ -867,10 +970,25 @@ export default {
                 tempPatient.fullname = sheetData[index]["Họ tên"];
               }
               if (sheetData[index]["Số điện thoại"]) {
-                tempPatient.phong_number = sheetData[index]["Số điện thoại"];
+                tempPatient.phone_number = sheetData[index]["Số điện thoại"];
               }
               if (sheetData[index]["Ngày sinh"]) {
-                tempPatient.birthday = sheetData[index]["Ngày sinh"];
+                if (Number.isInteger(Number(sheetData[index]["Ngày sinh"]))) {
+                  const dmy = this.excelSerialToDate(
+                    Number(sheetData[index]["Ngày sinh"])
+                  );
+                  console.log(dmy);
+                  console.log(dmy.getFullYear());
+                  console.log(dmy.getMonth() + 1);
+                  console.log(dmy.getDate());
+                  const dd = dmy.getDate();
+                  const mm = dmy.getMonth() + 1;
+                  const yyyy = dmy.getFullYear();
+                  tempPatient.birthday = `${yyyy}-${mm}-${dd}`;
+                  console.log("tempPatient.birthday", tempPatient.birthday);
+                } else {
+                  tempPatient.birthday = sheetData[index]["Ngày sinh"];
+                }
               }
               if (sheetData[index]["Email"]) {
                 tempPatient.email = sheetData[index]["Email"];
@@ -884,14 +1002,15 @@ export default {
                     return element.time === sheetData[index]["Khung giờ"];
                   });
                   if (findTime) {
-                    console.log("findTime", findTime);
+                    // console.log("findTime", findTime);
                     tempPatient.session = findTime.id;
+                    console.log("tempPatient.session", tempPatient.session);
                   }
                 }
               }
-              console.log("tempPatient", tempPatient);
+              // console.log("tempPatient", tempPatient);
               this.patient_.push(tempPatient);
-              console.log("this.patient_", this.patient_);
+              // console.log("this.patient_", this.patient_);
             }
             this.dialogImport = true;
           }
@@ -899,7 +1018,7 @@ export default {
 
         // Đọc file dưới dạng array buffer
         reader.readAsArrayBuffer(selectedFile);
-        console.log("reader", reader);
+        // console.log("reader", reader);
       } else {
         console.error("Invalid file format. Please select a XLSX file.");
         // Xử lý khi file không đúng định dạng
@@ -907,7 +1026,27 @@ export default {
 
       // Thực hiện các xử lý khác dựa trên file đã chọn
     },
+    excelSerialToDate(serial) {
+      const utc_days = Math.floor(serial - 25569);
+      const utc_value = utc_days * 86400;
+      const date_info = new Date(utc_value * 1000);
 
+      const fractional_day = serial - Math.floor(serial) + 0.0000001;
+
+      let total_seconds = Math.floor(86400 * fractional_day);
+
+      const seconds = total_seconds % 60;
+      total_seconds -= seconds;
+
+      const hours = Math.floor(total_seconds / (60 * 60));
+      const minutes = Math.floor(total_seconds / 60) % 60;
+
+      return new Date(
+        date_info.getFullYear(),
+        date_info.getMonth(),
+        date_info.getDate()
+      );
+    },
     dataTableStyle() {
       if (this.store.state.isLogin) {
         this.display_style = "block";
@@ -962,10 +1101,10 @@ export default {
       );
 
       // Trả về giá trị của biến A
-      var giaTriA = ngayThangJS.getTime() / 1000; // Chia cho 1000 để chuyển từ miligiây sang giây
+      // var giaTriA = ngayThangJS.getTime() / 1000; // Chia cho 1000 để chuyển từ miligiây sang giây
 
       // In ra giá trị của biến A
-      console.log("Giá trị của biến A: ", giaTriA / 44933);
+      // console.log("Giá trị của biến A: ", giaTriA / 44933);
     },
 
     async acceptUpdate() {
@@ -997,7 +1136,7 @@ export default {
           price: this.editedPackage.price,
           register_year: this.editedPackage.register_year,
         };
-        console.log("tempEditPackage", tempEditPackage);
+        // console.log("tempEditPackage", tempEditPackage);
         await this.filtersStore.updatePackInfo(tempEditPackage);
         await this.fetchFirstData();
         this.dialogEdit = false;
@@ -1014,7 +1153,7 @@ export default {
       this.single_circle_loader.icon = "mdi-content-save-settings";
       this.single_circle_loader.title = "Đang thực hiện...";
       this.single_circle_loader.state = true;
-      console.log("delete company...", this.editedPackage);
+      // console.log("delete company...", this.editedPackage);
       await axios
         .post(
           `${useRuntimeConfig().public.DOMAIN}/delete-company-service-packs`,
@@ -1024,7 +1163,7 @@ export default {
         )
         .then((response) => {
           if (response?.data) {
-            console.log("delete thành công", response.data);
+            // console.log("delete thành công", response.data);
             this.packages_.splice(this.editedPackageIndex, 1);
             // thông báo thành công
             this.store.state.snackbar = this.store.state.snackbar_default;
@@ -1089,46 +1228,39 @@ export default {
             ) {
               const appointment_packs =
                 this.editedPackage.appointment_company_service_packs;
-              console.log("appointment_packs", appointment_packs);
+              // console.log("appointment_packs", appointment_packs);
               for (let index = 0; index < appointment_packs.length; index++) {
                 // console.log(
-                //   "appointment_packs name.toString() === patient_ session.toString()",
+                //   `appointment_packs[
+                //     index
+                //   ].appointment_session.appointment_schedule.date.toString()`,
                 //   appointment_packs[
                 //     index
-                //   ].appointment_session.name.toString() ===
-                //     this.patient_[indexPatient].session.toString()
+                //   ].appointment_session.appointment_schedule.date.toString()
                 // );
                 // console.log(
-                //   "appointment_packs name.toString()",
-                //   appointment_packs[index].appointment_session.name
+                //   `this.filtersStore.ValDateToDataDate(
+                //       this.patient_[indexPatient].appointment_date`,
+                //   this.filtersStore.ValDateToDataDate(
+                //     this.patient_[indexPatient].appointment_date
+                //   )
                 // );
                 // console.log(
-                //   "this.patient_ session.toString()",
-                //   this.patient_[indexPatient].session
+                //   `appointment_packs[
+                //     index
+                //   ].appointment_session.appointment_schedule.date.toString() ===
+                //     this.filtersStore.ValDateToDataDate(
+                //       this.patient_[indexPatient].appointment_date
+                //     )`,
+                //   appointment_packs[
+                //     index
+                //   ].appointment_session.appointment_schedule.date.toString() ===
+                //     this.filtersStore.ValDateToDataDate(
+                //       this.patient_[indexPatient].appointment_date
+                //     )
+                //     ? "true"
+                //     : "false"
                 // );
-                console.log(
-                  "appointment_packs date",
-                  appointment_packs[index].appointment_session
-                    .appointment_schedule.date
-                );
-
-                console.log(
-                  "patient_ date.toString()",
-                  this.patient_[indexPatient]
-                );
-                console.log(
-                  `appointment_packs date.toString() === patient_ date.toString()`,
-                  appointment_packs[
-                    index
-                  ].appointment_session.appointment_schedule.date.toString() ===
-                    this.filtersStore.ValDateToDataDate(
-                      this.patient_[indexPatient].appointment_date
-                    )
-                );
-                console.log(
-                  "appointment_packs[index].appointment_session.id",
-                  appointment_packs[index].appointment_session.id
-                );
                 if (
                   appointment_packs[index].appointment_session?.name &&
                   appointment_packs[
@@ -1145,17 +1277,16 @@ export default {
                     ) &&
                   appointment_packs[index].appointment_session.id
                 ) {
+                  console.log("trueeeeeeee!!!");
                   variable.session_id =
                     appointment_packs[index].appointment_session.id;
                 }
               }
             }
             variable.fullname = this.patient_[indexPatient].fullname;
-            variable.phong_number = this.patient_[indexPatient].phong_number;
-            console.log("before val");
-            variable.birthday = this.filtersStore.ValDateToDataDate(
-              this.patient_[indexPatient].birthday
-            );
+            variable.phone_number = this.patient_[indexPatient].phone_number;
+            // console.log("before val");
+            variable.birthday = this.patient_[indexPatient].birthday;
             variable.email = this.patient_[indexPatient].email;
             variables.push(variable);
             console.log("variables", variables);
@@ -1178,7 +1309,7 @@ export default {
                     "Import dánh sách bệnh nhân thành công!";
                   this.store.state.snackbar.timeout = 3500;
                   this.store.state.snackbar.state = true;
-                  console.log("response.data", response.data);
+                  // console.log("response.data", response.data);
                   if (response.data.data?.insert_his_ace_patients?.returning) {
                     returning =
                       response.data.data?.insert_his_ace_patients?.returning;
@@ -1200,6 +1331,13 @@ export default {
             console.log("lỗi", error);
           }
           if (returning.length > 0) {
+            const headers = {
+              authentication: localStorage.getItem("loginToken")
+                ? localStorage.getItem("loginToken")
+                : "",
+            };
+            this.short_urls = [];
+            this.original_urls = [];
             for (let index = 0; index < returning.length; index++) {
               if (returning[index].email) {
                 try {
@@ -1208,46 +1346,46 @@ export default {
                       ? " " + returning[index].fullname
                       : ""
                   }!`;
-                  const headers = {
-                    authentication: localStorage.getItem("loginToken")
-                      ? localStorage.getItem("loginToken")
-                      : "",
-                  };
-                  await axios
-                    .post(`${useRuntimeConfig().public.DOMAIN}/send-email`, {
-                      variable: returning[index].email,
-                      headers,
-                    })
-                    .then((response) => {
-                      if (response.data?.success) {
-                        this.store.state.snackbar =
-                          this.store.state.snackbar_default;
-                        this.store.state.snackbar.text = `Gửi email cho bệnh nhân${
-                          returning[index].fullname
-                            ? " " + returning[index].fullname
-                            : ""
-                        } thành công!`;
-                        this.store.state.snackbar.timeout = 3500;
-                        this.store.state.snackbar.state = true;
-                        console.log("response.data", response.data);
-                      } else {
-                        // thông báo không thành công
-                        this.store.state.snackbar =
-                          this.store.state.snackbar_error;
-                        this.store.state.snackbar.text = `Gửi email cho bệnh nhân${
-                          returning[index].fullname
-                            ? " " + returning[index].fullname
-                            : ""
-                        } không thành công!`;
-                        this.store.state.snackbar.state = true;
 
-                        console.log("lỗi", error);
-                      }
-                    });
+                  // gửi email cho bệnh nhân
+                  const url = await this.filtersStore.sendEmail(
+                    headers,
+                    returning[index].email ? returning[index].email : "",
+                    returning[index].fullname ? returning[index].fullname : "",
+                    returning[index].phone_number
+                      ? returning[index].phone_number
+                      : "",
+                    returning[index].id
+                  );
+                  // console.log("short_url", short_url);
+                  // console.log("short_url", original_url);
+                  if (url) {
+                    this.short_urls.push(url.short_url);
+                    this.original_urls.push(url.original_url);
+                  }
+                  if (returning[index].phone_number) {
+                    // gửi sms cho bệnh nhân
+                    console.log("returning[index]", returning[index]);
+                    this.single_circle_loader.title = `Đang gửi SMS cho bệnh nhân${
+                      returning[index].fullname
+                        ? " " + returning[index].fullname
+                        : ""
+                    }!`;
+                    await this.filtersStore.sendSMS(
+                      headers,
+                      returning[index].phone_number
+                        ? returning[index].phone_number
+                        : "",
+                      returning[index].fullname
+                        ? returning[index].fullname
+                        : "",
+                      returning[index].id ? `${returning[index].id}` : "0"
+                    );
+                  }
                 } catch (error) {
                   // thông báo không thành công
                   this.store.state.snackbar = this.store.state.snackbar_error;
-                  this.store.state.snackbar.text = `Lỗi khi gửi email cho bệnh nhân${
+                  this.store.state.snackbar.text = `Lỗi khi gửi thông báo cho bệnh nhân${
                     returning[index].fullname
                       ? " " + returning[index].fullname
                       : ""
@@ -1257,10 +1395,35 @@ export default {
                   console.log("lỗi", error);
                 }
               }
+              else if (returning[index].phone_number) {
+                // gửi sms cho bệnh nhân
+                console.log("returning[index]", returning[index]);
+                this.single_circle_loader.title = `Đang gửi SMS cho bệnh nhân${
+                  returning[index].fullname
+                    ? " " + returning[index].fullname
+                    : ""
+                }!`;
+                await this.filtersStore.sendSMS(
+                  headers,
+                  returning[index].phone_number
+                    ? returning[index].phone_number
+                    : "",
+                  returning[index].fullname ? returning[index].fullname : "",
+                  returning[index].id ? `${returning[index].id}` : "0"
+                );
+              }
             }
+            console.log("this.short_urls", this.short_urls);
+            console.log("this.original_urls", this.original_urls);
+            this.dialogLinkList = true;
+            console.log(
+              "this.store.data.links",
+              this.store.data.links.toString()
+            );
           }
         }
       }
+
       // Đóng circle load
       this.single_circle_loader.state = false;
       this.single_circle_loader.icon = "";

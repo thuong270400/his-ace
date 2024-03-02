@@ -14,7 +14,8 @@
             ? `GÓI KHÁM ${
                 packs_[0]?.company?.name ? packs_[0].company.name : "CÔNG TY"
               }`
-            : store.data.user.permission === "admin"
+            : store.data.user.permission === "admin" ||
+              store.data.user.permission === "LH"
             ? "SỐ LƯỢNG KHÁM THỰC CỦA GÓI KHÁM"
             : "DANH SÁCH GÓI"
         }}
@@ -48,6 +49,7 @@
     :search="search"
   >
     <template v-slot:item.date="{ item }">
+      <div style="margin-top: 3vh"></div>
       <div
         v-for="(item2, index) in item.appointment_company_service_packs"
         :key="index"
@@ -68,7 +70,7 @@
             store.data.shift[Number(item2.appointment_session.name) - 1]?.time
           }})
         </span>
-        &nbsp;-&nbsp; số lượng:
+        &nbsp;-&nbsp; Số lượng khám:
         <span
           style="
             font-weight: bold;
@@ -88,7 +90,7 @@
             padding: 5px;
           "
         >
-          số lượng thực:
+          Số lượng thực khám:
           <span style="font-weight: bold">
             {{
               Number.isInteger(Number(item2.real_num)) && item2.real_num
@@ -97,8 +99,20 @@
             }}
           </span>
         </span>
+        &nbsp;-&nbsp;
+        <span>
+          Còn lại:
+          <span style="font-weight: bold">
+            {{ Number(item2.total_slot) - Number(item2.real_num) }}
+          </span>
+        </span>
         <br />
+        <v-divider
+          v-if="index < item.appointment_company_service_packs.length - 1"
+          style="margin-top: 8px"
+        ></v-divider>
       </div>
+      <div style="margin-bottom: 3vh"></div>
     </template>
     <template v-slot:item.actions="{ item }">
       <!-- <v-tooltip text="Tạo gói khám">
@@ -295,6 +309,7 @@ export default {
       headers: [
         { key: "name", title: "Tên gói khám" },
         { key: "date", title: "Thông tin ngày khám" },
+        { key: "company.name", title: "Tên công ty" },
         { title: "Actions", key: "actions", sortable: false },
       ],
       packs_: [],
@@ -425,14 +440,16 @@ export default {
           } else if (!Number.isInteger(Number(itemSessionPack.real_num))) {
             this.store.state.snackbar.text = "Số lượng thực phải là số!";
             this.store.state.snackbar.state = true;
-          } else if (
-            Number(itemSessionPack.real_num) >
-            Number(itemSessionPack.total_slot)
-          ) {
-            this.store.state.snackbar.text =
-              "Số lượng thực không được lớn hơn số lượng tổng!";
-            this.store.state.snackbar.state = true;
-          } else {
+          }
+          // else if (
+          //   Number(itemSessionPack.real_num) >
+          //   Number(itemSessionPack.total_slot)
+          // ) {
+          //   this.store.state.snackbar.text =
+          //     "Số lượng thực không được lớn hơn số lượng tổng!";
+          //   this.store.state.snackbar.state = true;
+          // }
+          else {
             this.editedItem.appointment_company_service_packs[index].real_num =
               Number(itemSessionPack.real_num);
             count_not_null_real_num++;

@@ -64,7 +64,20 @@
         </span>
         &nbsp;-&nbsp; số lượng:
         <span style="font-weight: bold">{{ item2.total_slot }}</span
-        ><br />
+        >&nbsp;
+        <v-tooltip text="Xóa buổi khám" location="bottom">
+          <template v-slot:activator="{ props }">
+            <v-icon
+              v-bind="props"
+              size="small"
+              class="me-2"
+              @click="deleteSessionPack(item2)"
+            >
+              mdi-delete
+            </v-icon>
+          </template>
+        </v-tooltip>
+        <br />
       </div>
     </template>
     <template v-slot:item.actions="{ item }">
@@ -99,7 +112,7 @@
           </v-icon>
         </template>
       </v-tooltip>
-      <v-tooltip text="Sửa thông tin gói khám" location="top">
+      <!-- <v-tooltip text="Sửa thông tin gói khám" location="top">
         <template v-slot:activator="{ props }">
           <v-icon
             v-bind="props"
@@ -123,8 +136,8 @@
             mdi-calendar-edit
           </v-icon>
         </template>
-      </v-tooltip>
-      <v-tooltip text="Xóa gói khám" location="bottom">
+      </v-tooltip> -->
+      <v-tooltip text="Từ chối gói khám" location="bottom">
         <template v-slot:activator="{ props }">
           <v-icon
             v-bind="props"
@@ -132,7 +145,7 @@
             class="me-2"
             @click="deleteItem(item)"
           >
-            mdi-delete
+            mdi-close-box
           </v-icon>
         </template>
       </v-tooltip>
@@ -153,12 +166,12 @@
   </v-data-table>
 
   <!-- Dialog xác nhận xóa thông tin gói khám -->
-  <v-dialog v-model="dialogDelete" max-width="50vw">
+  <v-dialog width="auto" v-model="dialogDelete" max-width="50vw">
     <v-card>
       <v-card-text class="text-h7">
         <v-row justify="center" style="text-align: center">
-          Bạn có chắc xóa gói&nbsp;<b>{{ editedPackage.name }}</b
-          >&nbsp;ra khỏi dữ liệu?
+          Từ chối gói&nbsp;<b>{{ editedPackage.name }}</b
+          >&nbsp;?
         </v-row>
       </v-card-text>
       <v-card-actions>
@@ -200,6 +213,34 @@
     </v-card>
   </v-dialog>
 
+  <!-- Dialog xác nhận duyệt gói khám -->
+  <v-dialog v-model="dialogConfirmDeleteSessionPack" max-width="50vw">
+    <v-card>
+      <v-card-text>
+        <v-row justify="center" style="text-align: center"
+          >Xác nhận xóa buổi khám&nbsp;<b>{{
+            editedSessionPack.appointment_session.appointment_schedule.date
+          }}</b
+          >?</v-row
+        >
+      </v-card-text>
+      <v-card-actions>
+        <v-btn
+          color="blue-darken-1"
+          variant="text"
+          @click="dialogConfirmDeleteSessionPack = false"
+          >Đóng</v-btn
+        >
+        <v-spacer></v-spacer>
+        <v-btn
+          color="blue-darken-1"
+          variant="text"
+          @click="deleteSessionPackConfirm"
+          >Xác nhận</v-btn
+        >
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
   <!-- Dialog xác nhận duyệt gói khám -->
   <v-dialog v-model="dialogConfirmAcceptPack" max-width="50vw">
     <v-card>
@@ -364,6 +405,7 @@ export default {
     dialogImport: false,
     dialogEdit: false,
     dialogConfirmAcceptPack: false,
+    dialogConfirmDeleteSessionPack: false,
     expanded: [],
 
     // loader
@@ -449,6 +491,18 @@ export default {
           },
         },
       ],
+    },
+    editedSessionPack: {
+      id: null,
+      total_slot: 0,
+      appointment_session: {
+        id: null,
+        name: null,
+        appointment_schedule: {
+          id: null,
+          date: null,
+        },
+      },
     },
     defaultPackage: {
       stt: null,
@@ -567,14 +621,17 @@ export default {
             : "",
         };
         await axios
-          .get(`${useRuntimeConfig().public.DOMAIN}/select-appointments-mutate`, {
-            params: {
-              internal_hospital_id: localStorage.getItem(
-                "internal_hospital_id"
-              ),
-              headers,
-            },
-          })
+          .get(
+            `${useRuntimeConfig().public.DOMAIN}/select-appointments-mutate`,
+            {
+              params: {
+                internal_hospital_id: localStorage.getItem(
+                  "internal_hospital_id"
+                ),
+                headers,
+              },
+            }
+          )
           .then(async (response) => {
             console.log(
               "response.data",
@@ -737,6 +794,11 @@ export default {
       this.fetching = false;
     },
 
+    deleteSessionPack(item2) {
+      this.editedSessionPack = Object.assign({}, item2);
+      this.dialogConfirmDeleteSessionPack = true;
+    },
+
     acceptPackage(item) {
       this.editedPackageIndex = this.packages_.indexOf(item);
       this.editedPackage = Object.assign({}, item);
@@ -748,6 +810,12 @@ export default {
       console.log("this.editedPackageIndex.id", this.editedPackage.id);
       await this.filtersStore.browsePack(this.editedPackage.id);
       this.dialogConfirmAcceptPack = false;
+      this.fetchFirstData();
+    },
+    async deleteSessionPackConfirm() {
+      console.log("confirm pack");
+      await this.filtersStore.deleteSessionPack(this.editedSessionPack.id);
+      this.dialogConfirmDeleteSessionPack = false;
       this.fetchFirstData();
     },
 
@@ -913,12 +981,10 @@ export default {
       this.single_circle_loader.title = "Đang thực hiện...";
       this.single_circle_loader.state = true;
       await axios
-        .post(
-          `${useRuntimeConfig().public.DOMAIN}/delete-company-service-packs`,
-          {
-            package_id: this.editedPackage.id,
-          }
-        )
+        .post(`${useRuntimeConfig().public.DOMAIN}/update-pack-status`, {
+          pack_id: this.editedPackage.id,
+          status: 2,
+        })
         .then((response) => {
           if (response?.data) {
             this.packages_.splice(this.editedPackageIndex, 1);
@@ -931,6 +997,9 @@ export default {
             this.single_circle_loader.state = false;
             this.single_circle_loader.icon = "";
             this.single_circle_loader.title = "";
+
+            // Load lại danh sách gói khám
+            this.store.state.isReFetch = true;
 
             this.dialogDelete = false;
 

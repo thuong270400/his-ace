@@ -31,6 +31,18 @@
           hide-details
         ></v-text-field>
       </v-col>
+      <v-col cols="auto">
+        <v-tooltip text="Xuất danh sách bệnh nhân (gửi mail)" location="top">
+          <template v-slot:activator="{ props }">
+            <v-btn
+              v-bind="props"
+              icon="mdi-microsoft-excel"
+              size="large"
+              class="btn_add_schedule"
+              @click="exportToExcel()"
+            ></v-btn> </template
+        ></v-tooltip>
+      </v-col>
       <!-- <v-col cols="auto" style="text-align: right">
         <v-btn color="primary" dark class="mb-2" @click="addPatient">
           Thêm bệnh nhân
@@ -84,10 +96,68 @@
       </v-icon>
       <v-icon size="small" @click="deleteItem(item)"> mdi-delete </v-icon>
     </template>
+    <template v-slot:item.actionsLH="{ item }">
+      <v-tooltip text="Xem danh sách buổi đã đặt" location="left">
+        <template v-slot:activator="{ props }">
+          <v-icon
+            v-bind="props"
+            size="small"
+            class="me-2"
+            @click="seenItem(item)"
+          >
+            mdi-table-eye
+          </v-icon>
+        </template>
+      </v-tooltip>
+    </template>
     <template v-slot:no-data>
       <v-btn color="primary"> Reset </v-btn>
     </template>
   </v-data-table>
+
+  <!-- Dialog xem buổi khám bệnh nhân đã đặt -->
+  <v-dialog v-model="dialogSeenItem" max-width="700px">
+    <v-card>
+      <v-card-text>
+        <v-container>
+          <v-row justify="center">
+            <v-col style="text-align: center">
+              <h3 style="color: #9b735e">
+                Xem lịch buổi khám khách hàng đã đặt
+              </h3>
+            </v-col>
+          </v-row>
+          <v-row class="ma-2" justify="center">
+            <v-col cols="12" class="check-box-col">
+              <span v-for="(item, i) in edited_session_packs_" :key="i">
+                <span
+                  style="
+                    background-color: #1867c0;
+                    color: white;
+                    border-radius: 7px;
+                    padding: 3.5px;
+                    border: 1px solid #98e055;
+                  "
+                  >{{ filtersStore.DataDateToValDate(item.date) }}</span
+                >&nbsp;-&nbsp; Ca
+                <span style="font-weight: bold">
+                  {{ item.session_name }}
+                </span>
+                <span style="font-size: 11px">
+                  ({{
+                    store.data.shift[Number(item.session_name) - 1]?.time
+                  }}) </span
+                >&ensp;-&ensp;{{ item.registered_patients }}/{{
+                  item.session_pack_slots
+                }}
+                <v-divider style="margin: 7px 0 7px 0"></v-divider>
+              </span>
+            </v-col>
+          </v-row>
+        </v-container>
+      </v-card-text>
+    </v-card>
+  </v-dialog>
 
   <!-- Dialog chỉnh sửa dữ liệu bệnh nhân -->
   <v-dialog v-model="dialog" max-width="700px">
@@ -153,6 +223,12 @@
                     style="font-weight: bold"
                   ></v-radio>
                 </span>
+                <v-radio
+                  label="Chưa đặt lịch"
+                  :value="null"
+                  style="font-weight: bold"
+                >
+                </v-radio>
               </v-radio-group>
             </v-col>
           </v-row>
@@ -256,6 +332,7 @@ import { storeToRefs } from "pinia";
 import Snackbar from "../utilities/Snackbar.vue";
 import ProgressCircular from "../utilities/ProgressCircular.vue";
 import SingleProgressCircular from "../utilities/SingleProgressCircular.vue";
+import * as XLSX from "xlsx";
 export default {
   name: "PatientPage",
   props: {
@@ -287,6 +364,7 @@ export default {
       overlay: false,
       formTitle: null,
       dialog: false,
+      dialogSeenItem: false,
       dialogDelete: false,
       search: "",
       editedIndex: -1,
@@ -350,6 +428,7 @@ export default {
         { key: "phone_number", title: "Số điện thoại" },
         { key: "appointment", title: "Ngày khám" },
         { title: "Actions", key: "actions", sortable: false },
+        { title: "ActionsLH", key: "actionsLH", sortable: false },
       ],
       patients_: [],
     };
@@ -362,6 +441,12 @@ export default {
     dialog(newVal, oldVal) {
       if (newVal === false) {
         this.close();
+      }
+    },
+
+    dialogSeenItem(newVal, oldVal) {
+      if (newVal === false) {
+        this.closeSeenItem();
       }
     },
 
@@ -379,7 +464,24 @@ export default {
   },
 
   methods: {
+    fetchHeader() {
+      if (
+        this.store.data.user.permission !== "admin" &&
+        this.store.data.user.permission !== "KD"
+      ) {
+        console.log("true");
+        this.headers = this.headers.filter(
+          (header) => header.key !== "actions"
+        );
+        console.log(this.headers);
+      } else if (this.store.data.user.permission === "KD") {
+        this.headers = this.headers.filter(
+          (header) => header.key !== "actionsLH"
+        );
+      }
+    },
     async fetchFirstData() {
+      this.fetchHeader();
       this.fetching = true;
       this.circle_loader.icon = "mdi-account-box";
       this.circle_loader.state = true;
@@ -408,7 +510,10 @@ export default {
           });
       }
       // admin xem bệnh nhân
-      else if (this.store.data.user.permission === "admin") {
+      else if (
+        this.store.data.user.permission === "admin" ||
+        this.store.data.user.permission === "KD"
+      ) {
         response = await axios
           .get(`${useRuntimeConfig().public.DOMAIN}/select-patients`, {
             params: {
@@ -421,8 +526,8 @@ export default {
           });
       }
       // manager xem bệnh nhân
-      else if (this.store.data.user.permission === "manager") {
-        await axios
+      else if (this.store.data.user.permission === "KH") {
+        response = await axios
           .get(`${useRuntimeConfig().public.DOMAIN}/select-patients-manager`, {
             params: {
               headers,
@@ -454,6 +559,7 @@ export default {
               pack_id: null,
               session_id: null,
               appointment: null,
+              short_url: null,
             };
             if (tempPatients[index].id) {
               tempPatient.id = tempPatients[index].id;
@@ -498,6 +604,11 @@ export default {
               )} - Ca ${tempPatient.session_name}(${
                 this.store.data.shift[Number(tempPatient.session_name) - 1].time
               })`;
+            }
+            if (tempPatients[index].shortlink?.short_url) {
+              tempPatient.short_url = `${useRuntimeConfig().public.DOMAIN}/${
+                tempPatients[index].shortlink.short_url
+              }`;
             }
             this.patients_.push(tempPatient);
           }
@@ -551,6 +662,70 @@ export default {
       this.circle_loader.state = false;
       this.circle_loader.icon = "";
       this.fetching = false;
+    },
+
+    exportToExcel() {
+      // Dữ liệu bạn muốn xuất ra Excel
+      const data = [
+        // Thêm dữ liệu khác nếu cần
+      ];
+      this.patients_.forEach(function (obj, index) {
+        const tempData = {
+          Phone: null,
+          Fullname: null,
+          ["Birthday (dd-mm-yyyy)"]: null,
+          Email: null,
+          Address: null,
+          ["Gender (0: Female, 1:Male)"]: 1,
+          ["Status (0:Disable, 1:Enable)"]: 1,
+          Category1: null,
+          ["Category1(0:No, 1:Yes)"]: null,
+          ["Category2(0:No, 1:Yes)"]: null,
+          ["Category3(0:No, 1:Yes)"]: null,
+          ["Category4(0:No, 1:Yes)"]: null,
+          ["Category5(0:No, 1:Yes)"]: null,
+          ["Field 1(character)"]: null,
+          ["Field 2(character)"]: null,
+          ["Field 3(character)"]: null,
+          ["Field 4(character)"]: null,
+          ["Field 5(character)"]: null,
+          ["Field 6(character)"]: null,
+          ["Field 7(character)"]: null,
+          ["Field 8(character)"]: null,
+          ["Field 9(character)"]: null,
+          ["Field 10(character)"]: null,
+        };
+        if (obj.phone_number) {
+          tempData.Phone = obj.phone_number;
+        }
+        if (obj.fullname) {
+          tempData.Fullname = obj.fullname;
+        }
+        if (obj.birthday) {
+          tempData["Birthday (dd-mm-yyyy)"] = obj.birthday;
+        }
+        if (obj.email) {
+          tempData.Email = obj.email;
+        }
+        if (obj.email) {
+          tempData.Email = obj.email;
+        }
+        if (obj.short_url) {
+          tempData.Address = obj.short_url;
+        }
+        data.push(tempData);
+      });
+
+      // Tạo một workbook mới
+      const wb = XLSX.utils.book_new();
+
+      // Tạo một sheet mới
+      const ws = XLSX.utils.json_to_sheet(data);
+      // Thêm sheet vào workbook
+      XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+
+      // Xuất file Excel
+      XLSX.writeFile(wb, "data.xls");
     },
     dataTableStyle() {
       if (this.store.state.isLogin) {
@@ -619,6 +794,54 @@ export default {
       this.dialog = true;
     },
 
+    async seenItem(item) {
+      this.circle_loader.state = true;
+      this.editedIndex = this.patients_.indexOf(item);
+      this.editedItem = Object.assign({}, item);
+      this.edited_session_packs_ = [];
+      for (let index = 0; index < this.session_packs_.length; index++) {
+        if (this.editedItem.pack_id === this.session_packs_[index].pack_id) {
+          this.edited_session_packs_.push(this.session_packs_[index]);
+        }
+      }
+      if (this.edited_session_packs_.length > 0) {
+        for (
+          let index = 0;
+          index < this.edited_session_packs_.length;
+          index++
+        ) {
+          if (
+            this.edited_session_packs_[index].pack_id &&
+            this.edited_session_packs_[index].session_id
+          )
+            await axios
+              .get(
+                `${
+                  useRuntimeConfig().public.DOMAIN
+                }/get-patient-appointment-total`,
+                {
+                  params: {
+                    pack_id: this.edited_session_packs_[index].pack_id,
+                    session_id: this.edited_session_packs_[index].session_id,
+                  },
+                }
+              )
+              .then((response) => {
+                console.log("response?.data", response?.data);
+                this.edited_session_packs_[index].registered_patients =
+                  response?.data;
+              })
+              .catch((e) => {
+                console.log("error fetching count patient pack", e);
+              });
+        }
+      }
+      console.log(this.edited_session_packs_);
+
+      this.circle_loader.state = false;
+      this.dialogSeenItem = true;
+    },
+
     labelWithFormatting(item) {
       return `${item.date}&ensp;-&ensp;Ca ${item.session_name}(${
         store.data.shift[Number(item.session_name) - 1]?.time
@@ -626,6 +849,13 @@ export default {
     },
 
     close() {
+      this.$nextTick(() => {
+        this.editedItem = Object.assign({}, this.defaultItem);
+        this.editedIndex = -1;
+      });
+    },
+
+    closeSeenItem() {
       this.$nextTick(() => {
         this.editedItem = Object.assign({}, this.defaultItem);
         this.editedIndex = -1;
@@ -739,9 +969,15 @@ export default {
           if (this.editedItem.pack_id) {
             Patient.pack_id = this.editedItem.pack_id;
           }
-          if (this.editedItem.session_id) {
+          if (
+            this.editedItem.session_id ||
+            this.editedItem.session_id === null
+          ) {
+            console.log("editedItem.session_id");
             Patient.session_id = this.editedItem.session_id;
           }
+          console.log("Patient", Patient);
+          console.log("this.editedItem.session_id", this.editedItem.session_id);
           await axios
             .get(`${useRuntimeConfig().public.DOMAIN}/update-patients`, {
               params: {
@@ -828,6 +1064,9 @@ export default {
 </script>
 
 <style scoped>
+.btn_add_schedule {
+  background: linear-gradient(to left, #c1cbd1, #ffffff, #c1cbd1);
+}
 .col-style {
   margin-top: -35px;
 }

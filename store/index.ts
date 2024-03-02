@@ -16,6 +16,7 @@ export const useFiltersStore = defineStore('filterStore', () => {
   })
 
   const state = ref({
+    isReFetch: false,
     // kiểm tra đăng nhập
     isLogin: false,
 
@@ -115,19 +116,19 @@ export const useFiltersStore = defineStore('filterStore', () => {
     shift: [
       {
         id: 1,
-        time: '07:30 - 09:30',
+        time: '07:30 - 09:00',
       },
       {
         id: 2,
-        time: '09:30 - 11:15',
+        time: '09:00 - 10:30',
       },
       {
         id: 3,
-        time: '13:00 - 15:00',
+        time: '13:00 - 14:00',
       },
       {
         id: 4,
-        time: '15:00 - 16:30',
+        time: '14:00 - 15:30',
       },
     ],
 
@@ -174,6 +175,7 @@ export const useFiltersStore = defineStore('filterStore', () => {
     },
 
     // =====Arrays
+    links: '',
     scheduleEvents: [],
     sessionPacks: [],
     tempDeleteSessionPacks: [],
@@ -183,46 +185,47 @@ export const useFiltersStore = defineStore('filterStore', () => {
   // Khởi tạo gói khám
   async function createPackageSchedule() {
     console.log("createPackageSchedule");
-    if (data.value.packageAdd?.session_packs?.length > 0) {
-      state.value.single_progress_circular.icon = "mdi-calendar-range";
-      state.value.single_progress_circular.title = "Đang khởi tạo";
-      state.value.single_progress_circular.state = true;
-      // xử lý chuẩn dữ liệu gói khám
-      data.value.packageAdd.register_year = Number(
-        data.value.packageAdd.register_year
-      );
-      data.value.packageAdd.price = Number(
-        data.value.packageAdd.price
-      );
-      data.value.packageAdd.number_of_employees = Number(
-        data.value.packageAdd.number_of_employees
-      );
-      console.log('data.value.packageAdd', data.value.packageAdd);
+    // if (data.value.packageAdd?.session_packs?.length > 0) {
+    state.value.single_progress_circular.icon = "mdi-calendar-range";
+    state.value.single_progress_circular.title = "Đang khởi tạo";
+    state.value.single_progress_circular.state = true;
+    // xử lý chuẩn dữ liệu gói khám
+    data.value.packageAdd.register_year = Number(
+      data.value.packageAdd.register_year
+    );
+    data.value.packageAdd.price = Number(
+      data.value.packageAdd.price
+    );
+    data.value.packageAdd.number_of_employees = Number(
+      data.value.packageAdd.number_of_employees
+    );
+    console.log('data.value.packageAdd', data.value.packageAdd);
 
-      try {
-        await axios
-          .post(`${useRuntimeConfig().public.DOMAIN}/add-pack-schedule`, {
-            package_add: data.value.packageAdd,
-          })
-          .then((response) => {
-            if (response.data) {
-              console.log("response.data", response.data);
-            }
-          });
-      } catch (error) {
-        console.log("error", error);
-      }
-      state.value.snackbar.text = "Thêm gói khám thành công!";
-      state.value.snackbar.state = true;
-      state.value.dialogPakageSchedule = false;
-      state.value.single_progress_circular.state = false;
-      state.value.single_progress_circular.icon = "";
-      state.value.single_progress_circular.title = "";
-    } else {
-      state.value.snackbar.text =
-        "Vui lòng đặt chỗ cho ít nhất 1 bệnh nhân của gói này!";
-      state.value.snackbar.state = true;
+    try {
+      await axios
+        .post(`${useRuntimeConfig().public.DOMAIN}/add-pack`, {
+          package_add: data.value.packageAdd,
+        })
+        .then((response) => {
+          if (response.data) {
+            console.log("response.data", response.data);
+          }
+        });
+    } catch (error) {
+      console.log("error", error);
     }
+    state.value.snackbar.text = "Thêm gói khám thành công!";
+    state.value.snackbar.state = true;
+    state.value.dialogPakageSchedule = false;
+    state.value.single_progress_circular.state = false;
+    state.value.single_progress_circular.icon = "";
+    state.value.single_progress_circular.title = "";
+    state.value.isReFetch = true;
+    // } else {
+    //   state.value.snackbar.text =
+    //     "Vui lòng đặt chỗ cho ít nhất 1 bệnh nhân của gói này!";
+    //   state.value.snackbar.state = true;
+    // }
   }
 
   // Cập nhật gói khám
@@ -241,7 +244,24 @@ export const useFiltersStore = defineStore('filterStore', () => {
             .then((response) => {
               if (response.data) {
                 console.log("response.data", response.data);
+              }
+            });
+        } catch (error) {
+          console.log("error", error);
+        }
+      }
+      console.log('data.value.packageAdd.id', data.value.packageAdd.id);
 
+      if (data.value.packageAdd.id) {
+        try {
+          await axios
+            .post(`${useRuntimeConfig().public.DOMAIN}/update-pack-status`, {
+              pack_id: data.value.packageAdd.id,
+              status: 0
+            })
+            .then((response) => {
+              if (response.data) {
+                console.log("response.data update", response.data);
               }
             });
         } catch (error) {
@@ -299,15 +319,64 @@ export const useFiltersStore = defineStore('filterStore', () => {
           .then((response) => {
             if (response.data) {
               console.log("response.data", response.data);
+              state.value.snackbar = state.value.snackbar_default
+              state.value.snackbar.text = "Duyệt gói khám thành công!";
+              state.value.snackbar.state = true;
+
+              // Load lại danh sách gói khám
+              state.value.isReFetch = true;
             }
           });
       } catch (error) {
         console.log("error", error);
+        state.value.snackbar = state.value.snackbar_error
+        state.value.snackbar.text = "Duyệt gói khám không thành công!";
+        state.value.snackbar.state = true;
       }
-      state.value.snackbar = state.value.snackbar_default
-      state.value.snackbar.text = "Duyệt gói khám thành công!";
-      state.value.snackbar.state = true;
       state.value.dialogPakageSchedule = false;
+      state.value.single_progress_circular.state = false;
+      state.value.single_progress_circular.icon = "";
+      state.value.single_progress_circular.title = "";
+    }
+  }
+
+  // Xóa buổi khám
+  async function deleteSessionPack(session_pack_id: number) {
+
+
+    if (session_pack_id) {
+      state.value.single_progress_circular.icon = "mdi-calendar-range";
+      state.value.single_progress_circular.title = "Đang thực hiện";
+      state.value.single_progress_circular.state = true;
+      const headers = {
+        authentication: localStorage.getItem("loginToken")
+          ? localStorage.getItem("loginToken")
+          : "",
+      };
+
+      try {
+        await axios
+          .post(`${useRuntimeConfig().public.DOMAIN}/delete-session-pack`, {
+            session_pack_id: session_pack_id,
+            headers
+          })
+          .then((response) => {
+            if (response.data) {
+              console.log("response.data", response.data);
+              state.value.snackbar = state.value.snackbar_default
+              state.value.snackbar.text = "Xóa buổi khám thành công!";
+              state.value.snackbar.state = true;
+
+              // Load lại danh sách gói khám
+              state.value.isReFetch = true;
+            }
+          });
+      } catch (error) {
+        state.value.snackbar = state.value.snackbar_error
+        state.value.snackbar.text = "Xóa buổi khám không thành công!";
+        state.value.snackbar.state = true;
+      }
+
       state.value.single_progress_circular.state = false;
       state.value.single_progress_circular.icon = "";
       state.value.single_progress_circular.title = "";
@@ -368,15 +437,39 @@ export const useFiltersStore = defineStore('filterStore', () => {
           .toISOString()
           .split("T")[0]
           .split("-");
-        const dateObject = new Date(`${yyyy}-${mm}-${dd}`);
+        const dateObject = new Date(`${yyyy}-${mm}-${((Number(dd) + 1)).toString()}`);
         dateConverted = dateObject.toISOString().split("T")[0];
       } else if (strDate && strDate.includes("-")) {
         const [dd, mm, yyyy] = strDate.split("-");
-        const dateObject = new Date(`${yyyy}-${mm}-${dd}`);
+        const dateObject = new Date(`${yyyy}-${mm}-${(Number(dd) + 1)}`);
         dateConverted = dateObject.toISOString().split("T")[0];
       } else if (strDate && strDate.includes("/")) {
         const [dd, mm, yyyy] = strDate.split("/");
-        const dateObject = new Date(`${yyyy}-${mm}-${dd}`);
+        const dateObject = new Date(`${yyyy}-${mm}-${((Number(dd) + 1)).toString()}`);
+        dateConverted = dateObject.toISOString().split("T")[0];
+      }
+    }
+    return dateConverted;
+  }
+
+  function ExcelDateToDataDate(date: string) {
+    let strDate = date;
+    let dateConverted = "";
+    if (strDate) {
+      if (Number.isInteger(Number(strDate))) {
+        const [mm, dd, yyyy] = new Date(strDate)
+          .toISOString()
+          .split("T")[0]
+          .split("-");
+        const dateObject = new Date(`${yyyy}-${mm}-${((Number(dd))).toString()}`);
+        dateConverted = dateObject.toISOString().split("T")[0];
+      } else if (strDate && strDate.includes("-")) {
+        const [mm, dd, yyyy] = strDate.split("-");
+        const dateObject = new Date(`${yyyy}-${mm}-${(Number(dd))}`);
+        dateConverted = dateObject.toISOString().split("T")[0];
+      } else if (strDate && strDate.includes("/")) {
+        const [mm, dd, yyyy] = strDate.split("/");
+        const dateObject = new Date(`${yyyy}-${mm}-${((Number(dd))).toString()}`);
         dateConverted = dateObject.toISOString().split("T")[0];
       }
     }
@@ -466,17 +559,124 @@ export const useFiltersStore = defineStore('filterStore', () => {
     }
   }
 
+  async function sendEmail(headers: object, email: string, fullname: string, phone_number: string, id_patient: string) {
+    console.log('headers', headers);
+    let short_url = ''
+    let original_url = ''
+    await axios
+      .post(`${useRuntimeConfig().public.DOMAIN}/send-email`, {
+        variable: email,
+        id_patient: id_patient,
+        headers,
+      })
+      .then(async (response) => {
+        if (response.data?.success) {
+          state.value.snackbar =
+            state.value.snackbar_default;
+          state.value.snackbar.text = `Gửi email cho bệnh nhân${fullname
+            ? " " + fullname
+            : ""
+            } thành công!`;
+          state.value.snackbar.timeout = 3500;
+          state.value.snackbar.state = true;
+          console.log("response.data", response.data);
+          console.log('response.data.original_url', response.data.original_url);
+          console.log('response.data.link', response.data.short_url);
+          const what = response.data.short_url ? 'true' : 'false'
+          console.log('what', what);
+          short_url = response.data.short_url
+          original_url = response.data.original_url
+          data.value.links += ',' + response.data.short_url
+        } else {
+          // thông báo không thành công
+          state.value.snackbar =
+            state.value.snackbar_error;
+          state.value.snackbar.text = `Gửi email cho bệnh nhân${fullname
+            ? " " + fullname
+            : ""
+            } không thành công!`;
+          state.value.snackbar.state = true;
+          return 0
+        }
+        // if (phone_number) {
+        //   await sendSMS(
+        //     headers,
+        //     phone_number
+        //       ? phone_number
+        //       : "",
+        //     fullname ? fullname : ""
+        //   );
+        // }
+      })
+      .catch((err) => {
+        // thông báo không thành công
+        state.value.snackbar =
+          state.value.snackbar_error;
+        state.value.snackbar.text = `Gửi email cho bệnh nhân${fullname
+          ? " " + fullname
+          : ""
+          } không thành công!`;
+        state.value.snackbar.state = true;
+        console.log("lỗi gửi email cho bệnh nhận", err);
+        return 0
+      });
+    return {
+      short_url: short_url,
+      original_url: original_url
+    }
+  }
+
+  async function sendSMS(headers: object, phone_number: string, fullname: string, request_id: string) {
+    console.log('headers', headers);
+
+    await axios
+      .post(`${useRuntimeConfig().public.DOMAIN}/send-sms`, {
+        phone_number: phone_number,
+        headers,
+        request_id: `appointment-${request_id}`
+      })
+      .then((response) => {
+        if (response.data?.success) {
+          state.value.snackbar =
+            state.value.snackbar_default;
+          state.value.snackbar.text = `Gửi SMS cho bệnh nhân${fullname
+            ? " " + fullname
+            : ""
+            } thành công!`;
+          state.value.snackbar.timeout = 3500;
+          state.value.snackbar.state = true;
+          console.log("response.data", response.data);
+        } else {
+          // thông báo không thành công
+          state.value.snackbar =
+            state.value.snackbar_error;
+          state.value.snackbar.text = `Gửi SMS cho bệnh nhân${fullname
+            ? " " + fullname
+            : ""
+            } không thành công!`;
+          state.value.snackbar.state = true;
+        }
+      })
+      .catch((err) => {
+        // thông báo không thành công
+        state.value.snackbar = state.value.snackbar_error;
+        state.value.snackbar.text = `Gửi SMS cho bệnh nhân${fullname
+          ? " " + fullname
+          : ""
+          } không thành công!`;
+        state.value.snackbar.state = true;
+        console.log("lỗi gửi SMS cho bệnh nhận", err);
+      });
+  }
+
   return {
-    ValDateToDataDate,
-    DataDateToValDate,
-    createPackageSchedule,
-    updatePakageSchedule,
-    browsePack,
+    sendEmail, sendSMS,
+    ValDateToDataDate, DataDateToValDate, ExcelDateToDataDate,
+    createPackageSchedule, updatePakageSchedule,
+    browsePack, deleteSessionPack,
     updatePackInfo,
-    fetchLogin,
-    fetchUser,
+    fetchLogin, fetchUser,
     filtersList,
-    state,
-    data
+    state, data
   }
 })

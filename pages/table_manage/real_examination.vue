@@ -60,7 +60,10 @@ export default defineComponent({
           ? localStorage.getItem("loginToken")
           : "",
       };
-      if (this.store.data.user.permission === "admin") {
+      if (
+        this.store.data.user.permission === "admin" ||
+        this.store.data.user.permission === "LH"
+      ) {
         console.log("axios admin real num pack");
         try {
           console.log("do axios admin!");
