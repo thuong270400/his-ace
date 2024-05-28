@@ -2,9 +2,11 @@
 const { query } = require('express');
 const client = require('../../../ConnectDatabase/his_ace')
 const { request, gql } = require('graphql-request');
-const endpoint = 'https://s-deal-app.hasura.app/v1/graphql';
+require('dotenv').config();
+
+const endpoint = process.env.ENDPOINT_HASURA;
 const headers = {
-  'x-hasura-admin-secret': 'Dx7ZGDCbTd3URW4Csh42UrkZTllgjLtmbBQ3TR5Gh8Ze34qXKFWYKjcCdwO2Nemr', // hoặc 'x-hasura-access-key': 'your-access-key'
+  'x-hasura-admin-secret': process.env.X_HASURA_ADMIN_SECRET, // hoặc 'x-hasura-access-key': 'your-access-key'
 };
 require('dotenv').config();
 module.exports = function (req, res) {
@@ -30,6 +32,9 @@ module.exports = function (req, res) {
   if (req.body?.variables) {
     console.log('req.body?.variables', req.body?.variables);
     req.body.variables.id = req.body.variables.id.toString()
+    if (!req.body.variables.session_id) {
+      req.body.variables.session_id = null
+    }
     // Câu lệnh truy vấn
     const update = gql`
       mutation MyMutation {

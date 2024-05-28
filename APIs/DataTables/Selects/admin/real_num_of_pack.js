@@ -8,7 +8,7 @@ module.exports = function (req, res) {
   // Câu lệnh truy vấn
   let query =
     `query MyQuery {
-              his_ace_company_service_packs(order_by: {created_at: desc}) {
+              his_ace_company_service_packs(where:{is_accepted: {_eq: 3}}, order_by: {created_at: desc}) {
                 id
                 code
                 company_id
@@ -19,7 +19,7 @@ module.exports = function (req, res) {
                 number_of_employees
                 price
                 register_year
-                appointment_company_service_packs {
+                appointment_company_service_packs(order_by: {appointment_session: {appointment_schedule: {date: asc}, name: asc}}) {
                   id
                   total_slot
                   real_num

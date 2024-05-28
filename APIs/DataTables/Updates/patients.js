@@ -1,29 +1,14 @@
 // server/APIs/login.js
 const { query } = require('express');
 const { request, gql } = require('graphql-request');
-const endpoint = 'https://s-deal-app.hasura.app/v1/graphql';
+require('dotenv').config();
+
+const endpoint = process.env.ENDPOINT_HASURA;
 const headers = {
-  'x-hasura-admin-secret': 'Dx7ZGDCbTd3URW4Csh42UrkZTllgjLtmbBQ3TR5Gh8Ze34qXKFWYKjcCdwO2Nemr', // hoặc 'x-hasura-access-key': 'your-access-key'
+  'x-hasura-admin-secret': process.env.X_HASURA_ADMIN_SECRET, // hoặc 'x-hasura-access-key': 'your-access-key'
 };
 require('dotenv').config();
 module.exports = function (req, res) {
-  function customStringify(obj, replacer, spaces) {
-    const stringify = (key, value) => {
-      if (replacer) {
-        return replacer(key, value);
-      }
-
-      // Nếu giá trị là một đối tượng và không phải là mảng, không thêm nháy kép cho khóa
-      if (typeof value === 'object' && !Array.isArray(value)) {
-        return `{${Object.keys(value).map(k => `${k}:${stringify(k, value[k])}`).join(',')}}`;
-      }
-
-      // Sử dụng JSON.stringify cho tất cả các giá trị khác
-      return JSON.stringify(value);
-    };
-
-    return JSON.stringify(obj, stringify, spaces);
-  }
   if (req.query && req.query.patient) {
     const patient = {}
     // Câu lệnh truy vấn
@@ -44,13 +29,19 @@ module.exports = function (req, res) {
     }
     if (req.query.patient.session_id) {
       patient.appointment_session_id = req.query.patient.session_id
+    } else {
+      patient.appointment_session_id = null
     }
     console.log('patient', patient);
-    const PatientStr = customStringify(patient, null, 2).replace(/\\/g, '').replace(/"{/g, '{').replace(/}"/g, '}')
-    console.log('insert data companies CompanyStr', PatientStr);
     const update = gql`
-      mutation MyMutation($_set: his_ace_patients_set_input = ${PatientStr}) {
-        update_his_ace_patients(where: {id: {_eq: ${'"' + req.query.patient.id + '"'}}}, _set: $_set) {
+      mutation MyMutation($_set: his_ace_patients_set_input = {
+        email: ${patient.email ? `"${patient.email}"` : null}, 
+        fullname: "${patient.fullname}", 
+        phone_number: ${patient.phone_number ? `"${patient.phone_number}"` : null}, 
+        birthday: "${patient.birthday}", 
+        company_service_pack_id: ${patient.company_service_pack_id}, 
+        appointment_session_id: ${patient.appointment_session_id}}) {
+        update_his_ace_patients(where: {id: {_eq: "${req.query.patient.id}"}}, _set: $_set) {
           affected_rows
           returning {
             id

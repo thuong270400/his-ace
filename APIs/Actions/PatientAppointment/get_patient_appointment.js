@@ -9,11 +9,11 @@ module.exports = async function (req, res) {
   var variables = {
   }
   let bodyCount = []
-  console.log('verify.email', req.verify?.email);
-  if (req.verify?.email) {
+  console.log('verify get-patient-appointment', req.verify);
+  if (req.verify?.id && (req.verify?.email || req.verify?.phone_number)) {
     let query =
       `query MyQuery {
-        his_ace_patients(where: {email: {_eq: "${req.verify.email}"}}) {
+        his_ace_patients(where: {id: {_eq: "${req.verify.id}"}}) {
           id
           fullname
           birthday
@@ -23,7 +23,7 @@ module.exports = async function (req, res) {
           appointment_session_id
           company_service_pack {
             id
-            appointment_company_service_packs {
+            appointment_company_service_packs(order_by: {appointment_session: {appointment_schedule: {date: asc}, name: asc}}) {
               id
               total_slot
               appointment_session {
@@ -39,6 +39,7 @@ module.exports = async function (req, res) {
         }
       } 
       `
+    console.log('query session and mail', query);
     await client.query(
       query,
       variables,

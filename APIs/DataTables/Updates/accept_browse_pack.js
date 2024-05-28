@@ -1,9 +1,11 @@
 // server/APIs/login.js
 const { query } = require('express');
 const { request, gql } = require('graphql-request');
-const endpoint = 'https://s-deal-app.hasura.app/v1/graphql';
+require('dotenv').config();
+
+const endpoint = process.env.ENDPOINT_HASURA;
 const headers = {
-  'x-hasura-admin-secret': 'Dx7ZGDCbTd3URW4Csh42UrkZTllgjLtmbBQ3TR5Gh8Ze34qXKFWYKjcCdwO2Nemr', // hoặc 'x-hasura-access-key': 'your-access-key'
+  'x-hasura-admin-secret': process.env.X_HASURA_ADMIN_SECRET, // hoặc 'x-hasura-access-key': 'your-access-key'
 };
 require('dotenv').config();
 module.exports = function (req, res) {
@@ -33,7 +35,7 @@ module.exports = function (req, res) {
     // console.log('insert data companies CompanyContactStr', CompanyContactStr);
     const insert = gql`
       mutation MyMutation {
-        update_his_ace_company_service_packs(where: {id: {_eq: ${req.body.pack_id}}}, _set: {is_accepted: 1}) {
+        update_his_ace_company_service_packs(where: {id: {_eq: ${req.body.pack_id}}}, _set: {is_accepted: 3}) {
           affected_rows
           returning {
             id

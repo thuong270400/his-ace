@@ -6,12 +6,12 @@ module.exports = function (req, res) {
   var variables = {
   }
   console.log('req.query.company_id', req.verify);
-  if (req.verify.company_id) {
+  if (req.verify.id) {
     const yearNow = new Date().getFullYear()
     // Câu lệnh truy vấn
     let query =
       `query MyQuery {
-        his_ace_patients(order_by: {created_at: desc}, where: {created_at: {_gte: "${yearNow - 1}-01-01T07:00:00+00:00"}, company_id: {_eq: ${req.verify.company_id}}, company_service_pack: {is_accepted: {_eq: 1}}}) {
+        his_ace_patients(order_by: {created_at: desc}, where: {created_at: {_gte: "${yearNow - 1}-01-01T07:00:00+00:00"},  company: {created_by: {_eq: "${req.verify.id}"}}, company_service_pack: {is_accepted: {_eq: 3}}}) {
           id
           fullname
           birthday
@@ -26,6 +26,10 @@ module.exports = function (req, res) {
               id
               date
             }
+          }
+          shortlink {
+            id
+            short_url
           }
         }
       }
@@ -46,6 +50,6 @@ module.exports = function (req, res) {
         res.status(500).json({ success: false, error: 'Internal Server Error' });
       })
   } else {
-    res.status(500).json({ success: false, error: 'không có company_id' });
+    res.status(500).json({ success: false, error: 'không có id user (in verify)' });
   }
 };

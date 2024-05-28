@@ -9,29 +9,30 @@ module.exports = function (req, res) {
     // Câu lệnh truy vấn
     let query =
       `query MyQuery {
-                his_ace_company_service_packs(order_by: {created_at: desc}, where: {is_accepted: {_eq: 1}}) {
+              his_ace_company_service_packs(order_by: {created_at: desc}, where: {is_accepted: {_neq: 0}}) {
+                id
+                code
+                company_id
+                name
+                number_of_employees
+                price
+                register_year
+                is_accepted
+                appointment_company_service_packs(order_by: {appointment_session: {appointment_schedule: {date: asc}, name: asc}}) {
                   id
-                  code
-                  company_id
-                  name
-                  number_of_employees
-                  price
-                  register_year
-                  appointment_company_service_packs {
+                  total_slot
+                  appointment_session {
                     id
-                    total_slot
-                    appointment_session {
+                    name
+                    appointment_schedule {
                       id
-                      name
-                      appointment_schedule {
-                        id
-                        date
-                      }
+                      date
                     }
                   }
                 }
-              }              
-            `
+              }
+            }              
+          `
     client.query(
       query,
       variables,

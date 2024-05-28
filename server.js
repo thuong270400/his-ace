@@ -1,12 +1,13 @@
 const express = require('express');
 const client = require('./ConnectDatabase/his_ace')
+const cronSMSPack = require('./APIs/Actions/PatientAppointment/send_sms_due_up')
+
 const bodyParser = require('body-parser');
 // const twilioConfig = require('./middlewares/twilioConfig');
 // const clientTwilio = require('twilio')(twilioConfig.accountSid, twilioConfig.authToken);
-const admin = require('firebase-admin');
-const serviceAccount = require('./middlewares/tfbvn-3755f-firebase-adminsdk-h72hc-8cb73c10aa.json'); // Đường dẫn đến tệp JSON chứa thông tin xác thực
-const firebase = require('firebase/app');
-require('firebase/messaging');
+
+// Thư viện rút gọn link
+// const { customAlphabet } = require('nanoid');
 
 var app = express();
 const cors = require('cors');
@@ -15,86 +16,50 @@ const auth = require('./middlewares/auth')
 const path = require('path');
 const multer = require('multer'); // Import multer for handling multipart/form-data
 const sharp = require('sharp'); // Import sharp for image processing
+const cron = require('node-cron');
+
+const shortid = require('shortid');
 
 const fs = require('fs'); // Import the fs module
+const { verify } = require('crypto');
 require('dotenv').config();
-// // Import the functions you need from the SDKs you need
-// import { initializeApp } from "firebase/app";
-// import { getAnalytics } from "firebase/analytics";
-// // TODO: Add SDKs for Firebase products that you want to use
-// // https://firebase.google.com/docs/web/setup#available-libraries
 
-// // Your web app's Firebase configuration
-// // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-// const firebaseConfig = {
-//   apiKey: "AIzaSyAl8t6hWMkUmYS-tW-CeimReeqxdVdYVso",
-//   authDomain: "tfbvn-3755f.firebaseapp.com",
-//   databaseURL: "https://tfbvn-3755f-default-rtdb.asia-southeast1.firebasedatabase.app",
-//   projectId: "tfbvn-3755f",
-//   storageBucket: "tfbvn-3755f.appspot.com",
-//   messagingSenderId: "182751926310",
-//   appId: "1:182751926310:web:c8a21b16021910f4ddaee7",
-//   measurementId: "G-6SHCHXWGBB"
-// };
-
-const firebaseConfig = {
-  apiKey: "AIzaSyAl8t6hWMkUmYS-tW-CeimReeqxdVdYVso",
-  authDomain: "tfbvn-3755f.firebaseapp.com",
-  projectId: "tfbvn-3755f",
-  storageBucket: "tfbvn-3755f.appspot.com",
-  messagingSenderId: "182751926310",
-  appId: "1:182751926310:web:c8a21b16021910f4ddaee7",
-  // measurementId: "G-6SHCHXWGBB"
-};
-
-firebase.initializeApp(firebaseConfig);
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }))
 
+
+// Đường dẫn đến thư mục .output tạo bởi yarn build
+const staticOutputPath = path.join(__dirname, '.output', 'server');
+
+// Phục vụ các tệp tĩnh từ thư mục .output
+app.use(express.static(staticOutputPath));
+
+const allowedOrigins = [
+  process.env.DOMAIN_WEB,
+  // 'http://192.168.89.232:3000',
+  // Thêm origins khác nếu cần
+];
 // cấu hình cho phép cổng truy cập
 app.all('/*', function (req, res, next) {
-  res.header("Access-Control-Allow-Origin", "http://localhost:3000");
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  // res.header("Access-Control-Allow-Origin", ['http://localhost:3000', 'http://192.168.89.232:3000',]);
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
   next();
 });
 
-// Cấu hình admin để gửi sms
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
+// Thiết lập cron job chạy vào mỗi 6h sáng hàng ngày
+cron.schedule('20 11 * * *', () => {
+  // Thực hiện công việc bạn muốn ở đây
+  console.log('Cron job đã được kích hoạt vào 6h sáng hàng ngày!');
+  cronSMSPack()
 });
-
-// ==SMS==
-
-// app.post('/send-fcm', async (req, res) => {
-//   try {
-//     const { token, message } = req.body;
-
-//     const payload = {
-//       notification: {
-//         title: 'Your Notification Title',
-//         body: message,
-//       },
-//     };
-
-//     const options = {
-//       priority: 'high',
-//       timeToLive: 60 * 60 * 24, // 1 day
-//     };
-
-//     const response = await admin.messaging().sendToDevice(token, payload, options);
-
-//     console.log('FCM sent:', response);
-//     res.status(200).send('FCM sent successfully');
-//   } catch (error) {
-//     console.error('Error sending FCM:', error);
-//     res.status(500).send('Failed to send FCM');
-//   }
-// });
-
 
 // ==IMAGE==
 // Configure multer to save uploaded files in a specific directory
@@ -102,29 +67,31 @@ const storage_img = multer.memoryStorage(); // Store uploaded files in memory
 const upload_img = multer({ storage_img });
 
 // lấy ảnh gửi lên từ client lưu vào server
-app.post('/upload-logo-company', upload_img.single('image'), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(800).send('No image uploaded.');
-    }
+app.post('/upload-logo-company', upload_img.single('image'), require('./APIs/Actions/HandleFile/upload_logo'));
 
-    const optimizedImageBuffer = await sharp(req.file.buffer)
-      .resize({ width: 400 })
-      .jpeg({ quality: 80 })
-      .toBuffer();
-    // Save the optimized image to the public/img directory
-    console.log('req.file.originalname', req.file.originalname);
-    const convertImageName = req.file.originalname.split('.')[0] + '.jpg'
-    console.log('convertImageName', convertImageName);
-    const imagePath = path.join(__dirname, 'assets', 'CompanyLogos', convertImageName);
-    fs.writeFileSync(imagePath, optimizedImageBuffer);
+// app.post('/upload-logo-company', upload_img.single('image'), async (req, res) => {
+//   try {
+//     if (!req.file) {
+//       return res.status(800).send('No image uploaded.');
+//     }
 
-    res.status(200).send('Image uploaded, optimized, and saved.');
-  } catch (error) {
-    console.error('Error uploading and saving image:', error);
-    res.status(500).send('Internal Server Error');
-  }
-});
+//     const optimizedImageBuffer = await sharp(req.file.buffer)
+//       .resize({ width: 400 })
+//       .jpeg({ quality: 80 })
+//       .toBuffer();
+//     // Save the optimized image to the public/img directory
+//     console.log('req.file.originalname', req.file.originalname);
+//     const convertImageName = req.file.originalname.split('.')[0] + '.jpg'
+//     console.log('convertImageName', convertImageName);
+//     const imagePath = path.join(__dirname, 'assets', 'CompanyLogos', convertImageName);
+//     fs.writeFileSync(imagePath, optimizedImageBuffer);
+
+//     res.status(200).send('Image uploaded, optimized, and saved.');
+//   } catch (error) {
+//     console.error('Error uploading and saving image:', error);
+//     res.status(500).send('Internal Server Error');
+//   }
+// });
 
 // gửi logo công ty về client
 app.get('/get_logo_company', (req, res) => {
@@ -144,9 +111,16 @@ app.get('/login', require('./APIs/login'));
 
 app.get('/auth', auth, function (req, res) {
   // console.log('req after verify', req);
-  res.json({
-    acceptLogin: true
-  })
+  if (req.verify) {
+    res.json({
+      acceptLogin: true,
+      verify: req.verify
+    })
+  } else {
+    res.json({
+      acceptLogin: false
+    })
+  }
 })
 app.get('/fetch-user', auth, function (req, res) {
   if (req.verify) {
@@ -159,16 +133,27 @@ app.get('/fetch-user', auth, function (req, res) {
   }
 })
 
+// * lỗi phát sinh khi bỏ cụm code gửi sms trên cụm convert hình ảnh
+// VARIABLE
+const urlMap = {};
+
+// Middleware để truyền biến vào request object
+app.use((req, res, next) => {
+  req.urlMap = urlMap;
+  next();
+});
+
 // ==DATA TABLE==
 // --companies--
 // select
-app.get('/select-companies', require('./APIs/DataTables/Selects/companies'));
+app.get('/select-companies', auth, require('./APIs/DataTables/Selects/companies'));
+app.get('/select-client-companies', auth, require('./APIs/DataTables/Selects/client/companies'));
 // insert
-app.get('/insert-companies', require('./APIs/DataTables/Inserts/companies'));
+app.get('/insert-companies', auth, require('./APIs/DataTables/Inserts/companies'));
 // update
-app.get('/update-companies', require('./APIs/DataTables/Updates/companies'));
+app.get('/update-companies', auth, require('./APIs/DataTables/Updates/companies'));
 // delete
-app.get('/delete-companies', require('./APIs/DataTables/Deletes/companies'));
+app.get('/delete-companies', auth, require('./APIs/DataTables/Deletes/companies'));
 
 // --appointment_schedules--
 // select
@@ -183,8 +168,8 @@ app.get('/select-appointments-mutate', auth, require('./APIs/DataTables/Selects/
 
 // --company_service_packs--
 // select
-app.get('/select-company-service-packs', require('./APIs/DataTables/Selects/company_service_packs'));
-app.get('/select-company-service-packs-manager', require('./APIs/DataTables/Selects/manager/company_service_packs_manager'));
+app.get('/select-company-service-packs', auth, require('./APIs/DataTables/Selects/company_service_packs'));
+app.get('/select-company-service-packs-manager', auth, require('./APIs/DataTables/Selects/manager/company_service_packs_manager'));
 app.get('/select-packs-of-company', require('./APIs/DataTables/Selects/packs_of_company'));
 app.get('/browse-packs', require('./APIs/DataTables/Selects/browse_packs'));
 app.get('/admin-real-num-of-pack', auth, require('./APIs/DataTables/Selects/admin/real_num_of_pack'));
@@ -213,6 +198,7 @@ app.get('/select-session-packs', require('./APIs/DataTables/Selects/appointment_
 // insert
 // update
 // delete
+app.post('/delete-session-pack', auth, require('./APIs/DataTables/Deletes/delete_session_pack'));
 
 // ===Action===
 // Lấy bệnh nhân cho gói khám
@@ -222,9 +208,17 @@ app.get('/auth-email-patient', auth, require('./APIs/Actions/PatientAppointment/
 app.get('/get-patient-appointment-total', require('./APIs/Actions/PatientAppointment/get_patient_appointment_total'));
 
 // Thêm gói khám cho công ty
+app.post('/add-pack', require('./APIs/Actions/PackSchedule/add_pack'));
+
+// Thêm lịch khám cho công ty
 app.post('/add-pack-schedule', require('./APIs/Actions/PackSchedule/add_pack_schedule'));
+
 // Cập nhật lịch cho gói khám
 app.post('/update-pack-schedule', require('./APIs/Actions/PackSchedule/update_pack_schedule'))
+
+// Cập nhật trạng thái gói khám về 0
+app.post('/update-pack-status', require('./APIs/Actions/PackSchedule/update_pack_status'))
+
 // Xóa lịch cho gói khám
 app.post('/delete-pack-schedule', require('./APIs/Actions/PackSchedule/delete_pack_schedule'))
 
@@ -234,18 +228,57 @@ app.post('/add-patient-appointment', require('./APIs/Actions/PatientAppointment/
 // Thêm lịch cho gói khám
 app.post('/add-schedule-session', require('./APIs/Actions/ScheduleSession/add_schedule_session'));
 
+// Sửa giới hạn slot buổi khám
+app.post('/update-session-limit', require('./APIs/Actions/ScheduleSession/update_session_limit'));
+
+// Xóa buổi khám
+app.post('/delete-session', auth, require('./APIs/Actions/ScheduleSession/delete_session'));
+
 // Cập nhật bệnh nhân cho gói khám
 app.post('/update-patient-appointment', require('./APIs/Actions/PatientAppointment/update_patient_appointment'));
 
 // Gửi email
-app.post('/send-email', auth, require('./APIs/Actions/PatientAppointment/send_email'));
+app.post('/send-email', require('./APIs/Actions/PatientAppointment/send_email'));
+
+app.post('/send-email-2', require('./APIs/Actions/PatientAppointment/send_email_2'));
+
+// Gửi SMS
+app.post('/send-sms', auth, require('./APIs/Actions/PatientAppointment/send_sms'));
+app.post('/send-sms-update', require('./APIs/Actions/PatientAppointment/send_sms_update'));
 
 // --Other
 // quick select package_ids
 app.get('/quick-select-package_ids', auth, require('./APIs/Actions/Other/QuickSelect/package_ids'));
 
-var server = app.listen(8082, function () {
+// ==SMS==
+// app.post('/shorten', (req, res) => {
+//   const originalUrl = req.body.url;
+//   const shortUrl = shortid.generate();
+//   urlMap[shortUrl] = originalUrl;
+//   res.json({ shortUrl: `http://localhost:8082/${shortUrl}` });
+// });
+
+// Endpoint để chuyển hướng từ short URL đến đường dẫn gốc
+// app.get('/:shortUrl', (req, res) => {
+//   const shortUrl = req.params.shortUrl;
+//   const originalUrl = urlMap[shortUrl];
+
+//   if (originalUrl) {
+//     res.redirect(originalUrl);
+//   } else {
+//     res.status(404).json({ error: 'Link not found' });
+//   }
+// });
+app.get('/:shortUrl', require('./middlewares/short_url'));
+
+// test
+app.get('/test-api', require('./APIs/Actions/test_api'));
+app.post('/test-api', require('./APIs/Actions/test_api'));
+
+const ipAddress = '192.168.100.117';
+// var server = app.listen(process.env.PORT, ipAddress, function () {
+//   console.log("App runing on: " + server.address().address + ":" + server.address().port);
+// })
+var server = app.listen(process.env.PORT, '0.0.0.0', function () {
   console.log("App runing on: " + server.address().address + ":" + server.address().port);
 })
-
-

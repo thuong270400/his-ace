@@ -11,7 +11,7 @@ module.exports = function (req, res) {
         const dateNow = new Date()
 
         // Tăng thêm 3 ngày
-        dateNow.setDate(dateNow.getDate() + 3);
+        dateNow.setDate(dateNow.getDate() + 4);
 
         // Chuyển đổi thanhd chuỗi định dạng ISO
         const threeDaysLater = dateNow.toISOString().split('T')[0]

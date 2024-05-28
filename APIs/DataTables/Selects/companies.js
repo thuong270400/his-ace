@@ -11,11 +11,12 @@ module.exports = function (req, res) {
     // Câu lệnh truy vấn
     let query =
       `query MyQuery {
-        his_ace_companies(where: {internal_hospital_id: {_eq: 1}}, order_by: {created_at: asc}) {
+        his_ace_companies(order_by: {created_at: desc}) {
           id
           code
           name
           phone_number
+          url_image
           website
           address
           company_contacts {

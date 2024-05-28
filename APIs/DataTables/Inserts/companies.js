@@ -1,9 +1,11 @@
 // server/APIs/login.js
 const { query } = require('express');
 const { request, gql } = require('graphql-request');
-const endpoint = 'https://s-deal-app.hasura.app/v1/graphql';
+require('dotenv').config();
+
+const endpoint = process.env.ENDPOINT_HASURA;
 const headers = {
-  'x-hasura-admin-secret': 'Dx7ZGDCbTd3URW4Csh42UrkZTllgjLtmbBQ3TR5Gh8Ze34qXKFWYKjcCdwO2Nemr', // hoặc 'x-hasura-access-key': 'your-access-key'
+  'x-hasura-admin-secret': process.env.X_HASURA_ADMIN_SECRET, // hoặc 'x-hasura-access-key': 'your-access-key'
 };
 require('dotenv').config();
 module.exports = function (req, res) {

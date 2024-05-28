@@ -10,7 +10,7 @@ module.exports = function (req, res) {
   // Câu lệnh truy vấn
   let query =
     `query MyQuery {
-        his_ace_patients(order_by: {created_at: desc}, where: {created_at: {_gte: "${yearNow - 1}-01-01T07:00:00+00:00"},company_service_pack: {is_accepted: {_eq: 1}}}) {
+        his_ace_patients(order_by: {created_at: desc}, where: {created_at: {_gte: "${yearNow - 1}-01-01T07:00:00+00:00"},company_service_pack: {is_accepted: {_eq: 3}}}) {
           id
           fullname
           birthday
@@ -25,6 +25,10 @@ module.exports = function (req, res) {
               id
               date
             }
+          }
+          shortlink {
+            id
+            short_url
           }
         }
       }

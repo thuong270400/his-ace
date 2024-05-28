@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const conn = require('../ConnectDatabase')
+require('dotenv').config();
 
 const check = (async (req, res, next) => {
     let a = new Promise(function checkUserPassUser(resolve) {

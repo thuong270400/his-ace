@@ -23,7 +23,7 @@ module.exports = function (req, res) {
         }
 
         `
-    // console.log('queryLogin', queryLogin);
+    console.log('queryLogin', queryLogin);
     client.query(
       queryLogin,
       variables,
@@ -41,6 +41,7 @@ module.exports = function (req, res) {
             ToKen: jwt.sign({
               permission: body?.data?.his_ace_users[0]?.permission ? body?.data?.his_ace_users[0]?.permission : '',
               company_id: body?.data?.his_ace_users[0]?.company_id ? body?.data?.his_ace_users[0]?.company_id : '',
+              id: body?.data?.his_ace_users[0]?.id ? body?.data?.his_ace_users[0]?.id : '',
             },
               process.env.SECRET_KEY,
               {
@@ -49,6 +50,7 @@ module.exports = function (req, res) {
             RefreshToken: jwt.sign({
               permission: body?.data?.his_ace_users[0]?.permission ? body?.data?.his_ace_users[0]?.permission : '',
               company_id: body?.data?.his_ace_users[0]?.company_id ? body?.data?.his_ace_users[0]?.company_id : '',
+              id: body?.data?.his_ace_users[0]?.id ? body?.data?.his_ace_users[0]?.id : '',
             },
               process.env.REFRESS_SECRET_KEY,
               {
@@ -57,6 +59,7 @@ module.exports = function (req, res) {
             internal_hospital_id: body?.data?.his_ace_users[0]?.internal_hospital_id,
             permission: body?.data?.his_ace_users[0]?.permission ? body?.data?.his_ace_users[0]?.permission : '',
             company_id: body?.data?.his_ace_users[0]?.company_id ? body?.data?.his_ace_users[0]?.company_id : '',
+            id: body?.data?.his_ace_users[0]?.id ? body?.data?.his_ace_users[0]?.id : '',
           })
         } else {
           console.log('else from loging!');
@@ -65,7 +68,7 @@ module.exports = function (req, res) {
           })
         }
       }).catch(function (err) {
-        console.log(err.message)
+        console.log('err Login false!', err)
         res.status(500).json({ error: 'Login false!' });
       })
   } else {
