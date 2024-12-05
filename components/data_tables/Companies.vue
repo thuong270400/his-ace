@@ -48,7 +48,7 @@
   >
     <template v-slot:item.logo="{ item }">
       <v-img
-        :src="item.logo"
+        :src="base64Img(item.url_image)"
         width="100%"
         alt="Hình ảnh từ máy chủ"
         loading="lazy"
@@ -74,15 +74,21 @@
     <template v-slot:item.contact="{ item }">
       <div style="white-space: pre-wrap">
         Họ và tên:
-        <span v-if="item.website" style="font-weight: bold">
+        <span
+          v-if="item.company_contacts[0].fullname"
+          style="font-weight: bold"
+        >
           {{ item.company_contacts[0].fullname }} </span
         ><br />
         Email:
-        <span v-if="item.phone_number" style="font-weight: bold">
+        <span v-if="item.company_contacts[0].email" style="font-weight: bold">
           {{ item.company_contacts[0].email }} </span
         ><br />
         SĐT:
-        <span v-if="item.address" style="font-weight: bold">
+        <span
+          v-if="item.company_contacts[0].phone_number"
+          style="font-weight: bold"
+        >
           {{ item.company_contacts[0].phone_number }}
         </span>
       </div>
@@ -143,7 +149,7 @@
               <v-text-field
                 v-model="editedItem.name"
                 color="blue"
-                label="Tên công ty"
+                label="Tên công ty(*)"
                 variant="outlined"
               ></v-text-field>
             </v-col>
@@ -153,7 +159,7 @@
                 :rules="phoneNumberRule"
                 color="blue"
                 maxlength="11"
-                label="Số điện thoại"
+                label="Số điện thoại công ty(*Số Việt Nam)"
                 variant="outlined"
               ></v-text-field>
             </v-col>
@@ -161,7 +167,7 @@
               <v-text-field
                 v-model="editedItem.website"
                 color="blue"
-                label="Website"
+                label="Website công ty"
                 variant="outlined"
               ></v-text-field>
             </v-col>
@@ -169,7 +175,7 @@
               <v-text-field
                 v-model="editedItem.address"
                 color="blue"
-                label="Địa chỉ"
+                label="Địa chỉ(*)"
                 variant="outlined"
               ></v-text-field>
             </v-col>
@@ -177,7 +183,7 @@
               <v-text-field
                 v-model="editedItem.company_contacts[0].fullname"
                 color="blue"
-                label="Tên người liên hệ"
+                label="Tên người liên hệ(*)"
                 variant="outlined"
               ></v-text-field>
             </v-col>
@@ -187,7 +193,7 @@
                 :rules="phoneNumberRule"
                 color="blue"
                 maxlength="11"
-                label="Số điện thoại người liên hệ"
+                label="Số điện thoại người liên hệ(*Số Việt Nam)"
                 variant="outlined"
               ></v-text-field>
             </v-col>
@@ -196,7 +202,7 @@
                 v-model="editedItem.company_contacts[0].email"
                 :rules="emailRules"
                 color="blue"
-                label="Email người liên hệ"
+                label="Email người liên hệ(*)"
                 variant="outlined"
               ></v-text-field>
             </v-col>
@@ -204,7 +210,7 @@
               <v-text-field
                 v-model="editedItem.company_contacts[0].position"
                 color="blue"
-                label="Chức vụ người liên hệ"
+                label="Chức vụ người liên hệ(*)"
                 variant="outlined"
               ></v-text-field>
             </v-col>
@@ -286,7 +292,6 @@
             <v-col class="col-edit" cols="12" sm="6" md="4">
               <v-text-field
                 v-model="store.data.packageAdd.price"
-                :rules="[numberRule]"
                 label="Giá trị gói khám"
                 variant="outlined"
                 @focus="followKSKPrice"
@@ -389,6 +394,7 @@
 import axios from "axios";
 import { useFiltersStore } from "~/store/index.ts";
 import { storeToRefs } from "pinia";
+import numeral from "numeral";
 import Calendar from "../time_manage/Calendar.vue";
 import Snackbar from "../utilities/Snackbar.vue";
 import ProgressCircular from "../utilities/ProgressCircular.vue";
@@ -525,7 +531,7 @@ export default {
         (v) => {
           if (v) {
             if (/^[Z0-9-()]+(\s+[Z0-9-()]+)*$/.test(v)) {
-              if (v[0] === "0" && v.length === 11) {
+              if (v[0] === "0" && (v.length === 11 || v.length === 10)) {
                 return true;
               }
               return "sdt phải có 10 số. Vd: 07012345678";
@@ -562,6 +568,12 @@ export default {
     }
   },
   watch: {
+    "store.data.packageAdd.price"() {
+      // Định dạng giá tiền với dấu phẩy ở hàng nghìn, triệu, tỷ, v.v.
+      this.store.data.packageAdd.price = numeral(
+        this.store.data.packageAdd.price
+      ).format("0,0");
+    },
     // async "store.state.isLogin"(newValue, oldValue) {
     //   console.log("oldValue", oldValue, "and NewValue2", newValue);
     //   if (this.store.state.isLogin === true) {
@@ -602,12 +614,19 @@ export default {
     },
   },
   methods: {
+    base64Img(base64Str) {
+      return `data:image/png;base64,${base64Str ? base64Str : ""}`;
+    },
     async checkBeforeCreatePack() {
       this.store.state.snackbar.variant = "flat";
       this.store.state.snackbar.color_text = "#5f9431";
       this.store.state.snackbar.color_close = "white";
       this.store.state.snackbar.timeout = 3000;
 
+      this.store.data.packageAdd.price = parseInt(
+        this.store.data.packageAdd.price.replace(/\D/g, ""),
+        10
+      );
       if (!this.store.data.packageAdd.name) {
         console.log(this.store.state);
         this.store.state.snackbar.text = "Tên gói khám không được để trống!";
@@ -695,39 +714,42 @@ export default {
           ? localStorage.getItem("loginToken")
           : "",
       };
-      if (
-        this.store.data.user.permission === "admin" ||
-        this.store.data.user.permission === "KD"
-      ) {
+      if (this.store.data.user.permission === "admin") {
         console.log("gửi axios");
-        await axios
-          .get(`${useRuntimeConfig().public.DOMAIN}/select-companies`, {
+        // const response = await $fetch("/api/DataTables/Selects/companies", {
+        //   method: "post",
+        //   body: {
+        //     internal_hospital_id: localStorage.getItem("internal_hospital_id"),
+        //     headers,
+        //   },
+        // });
+        const response = await axios.get(
+          `${useRuntimeConfig().public.DOMAIN}/select-companies`,
+          {
             params: {
               internal_hospital_id: localStorage.getItem(
                 "internal_hospital_id"
               ),
               headers,
             },
-          })
-          .then(async (response) => {
-            console.log("response.data", response?.data?.his_ace_companies);
-            // this.posts = response.data;
-            if (response?.data?.his_ace_companies) {
-              this.companies_ = response?.data?.his_ace_companies;
-              console.log("companies_data_", this.companies_);
+          }
+        );
+        if (response) {
+          console.log("response.data", response);
+          // this.posts = response.data;
+          if (response?.data?.his_ace_companies) {
+            this.companies_ = response?.data?.his_ace_companies;
+            console.log("companies_data_", this.companies_);
+          }
+          if (this.companies_ && this.companies_.length > 0) {
+            let stt = 0;
+            for (let index = 0; index < this.companies_.length; index++) {
+              this.companies_[index].stt = ++stt;
+              // await this.getImageData(this.companies_[index].id, index);
             }
-            if (this.companies_ && this.companies_.length > 0) {
-              let stt = 0;
-              for (let index = 0; index < this.companies_.length; index++) {
-                this.companies_[index].stt = ++stt;
-                await this.getImageData(this.companies_[index].id, index);
-              }
-            }
-          })
-          .catch((e) => {
-            console.log("không có data", e);
-          });
-      } else if (this.store.data.user.permission === "KH") {
+          }
+        }
+      } else if (this.store.data.user.permission === "KD") {
         await axios
           .get(`${useRuntimeConfig().public.DOMAIN}/select-client-companies`, {
             params: {
@@ -748,7 +770,7 @@ export default {
               let stt = 0;
               for (let index = 0; index < this.companies_.length; index++) {
                 this.companies_[index].stt = ++stt;
-                await this.getImageData(this.companies_[index].id, index);
+                // await this.getImageData(this.companies_[index].id, index);
               }
             }
           })
@@ -1041,6 +1063,7 @@ export default {
       await axios
         .get(`${useRuntimeConfig().public.DOMAIN}/delete-companies`, {
           params: {
+            headers: headers,
             company_id: this.editedItem.id,
             company_contact_id: this.editedItem.company_contacts[0]?.id,
           },
@@ -1113,6 +1136,21 @@ export default {
         this.store.state.snackbar.text =
           "Số điện thoại công ty không được để trống!";
         this.store.state.snackbar.state = true;
+      } else if (
+        !/^[Z0-9-()]+(\s+[Z0-9-()]+)*$/.test(this.editedItem.phone_number)
+      ) {
+        this.store.state.snackbar.text = "Số điện thoại công ty phải là số";
+        this.store.state.snackbar.state = true;
+      } else if (
+        !(
+          this.editedItem.phone_number[0] === "0" &&
+          (this.editedItem.phone_number.length === 11 ||
+            this.editedItem.phone_number.length === 10)
+        )
+      ) {
+        this.store.state.snackbar.text =
+          "Sđt công ty phải có 10 hoặc 11 số. Vd: 07012345678";
+        this.store.state.snackbar.state = true;
       } else if (!this.editedItem.address) {
         this.store.state.snackbar.text = "Địa chỉ công ty không được để trống!";
         this.store.state.snackbar.state = true;
@@ -1124,9 +1162,36 @@ export default {
         this.store.state.snackbar.text =
           "Số điện thoại người liên hệ không được để trống!";
         this.store.state.snackbar.state = true;
+      } else if (
+        !/^[Z0-9-()]+(\s+[Z0-9-()]+)*$/.test(
+          this.editedItem.company_contacts[0].phone_number
+        )
+      ) {
+        this.store.state.snackbar.text =
+          "Số điện thoại người liên hệ phải là số";
+        this.store.state.snackbar.state = true;
+      } else if (
+        !(
+          this.editedItem.company_contacts[0].phone_number[0] === "0" &&
+          (this.editedItem.company_contacts[0].phone_number.length === 11 ||
+            this.editedItem.company_contacts[0].phone_number.length === 10)
+        )
+      ) {
+        this.store.state.snackbar.text =
+          "Sđt người liên hệ phải có 10 hoặc 11 số. Vd: 07012345678";
+        this.store.state.snackbar.state = true;
       } else if (!this.editedItem.company_contacts[0].position) {
         this.store.state.snackbar.text =
           "Chức vụ người liên hệ không được để trống!";
+        this.store.state.snackbar.state = true;
+      } else if (
+        !this.editedItem.company_contacts[0].email ||
+        !/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,4})+$/.test(
+          this.editedItem.company_contacts[0].email
+        )
+      ) {
+        this.store.state.snackbar.text =
+          "email phải đúng định dạng. vd: nvmau@gmail.com";
         this.store.state.snackbar.state = true;
       } else {
         this.store.state.single_progress_circular.icon =
@@ -1157,9 +1222,15 @@ export default {
             phone_number: this.editedItem.company_contacts[0]?.phone_number,
             position: this.editedItem.company_contacts[0]?.position,
           };
+          const headers = {
+            authentication: localStorage.getItem("loginToken")
+              ? localStorage.getItem("loginToken")
+              : "",
+          };
           await axios
             .get(`${useRuntimeConfig().public.DOMAIN}/update-companies`, {
               params: {
+                headers: headers,
                 company: Company,
                 company_id: this.editedItem.id,
                 company_contact: CompanyContact,
@@ -1199,6 +1270,7 @@ export default {
         // Thêm công ty
         else {
           this.store.state.single_progress_circular.title = "Đang lưu...";
+          console.log("this.store.data.user.id", this.store.data.user.id);
           const Objects = {
             address: this.editedItem.address,
             code: null,
@@ -1208,6 +1280,7 @@ export default {
             url_image: null,
             website: this.editedItem.website,
             status: 1,
+            created_by: this.store.data.user.id,
             company_contacts: {
               data: {
                 address: null,
@@ -1222,10 +1295,16 @@ export default {
               },
             },
           };
+          const headers = {
+            authentication: localStorage.getItem("loginToken")
+              ? localStorage.getItem("loginToken")
+              : "",
+          };
           await axios
             .get(`${useRuntimeConfig().public.DOMAIN}/insert-companies`, {
               params: {
                 objects: Objects,
+                headers: headers,
               },
             })
             .then(async (response) => {
@@ -1292,6 +1371,7 @@ export default {
 
         const filename = `${company_id}.jpg`;
         formData.append("image", this.selectedLogo, filename);
+        formData.append("company_id", company_id);
         console.log("formData img", formData);
         try {
           await axios.post(
@@ -1316,30 +1396,30 @@ export default {
         console.log("không có hình ảnh được chọn");
       }
     },
-    async getImageData(company_id, index) {
-      try {
-        const imageName = `${company_id}.jpg`;
-        const response = await axios.get(
-          `${useRuntimeConfig().public.DOMAIN}/get_logo_company`,
-          {
-            responseType: "arraybuffer", // Cho phép nhận dữ liệu nhị phân (binary data)
-            params: { imageName: imageName },
-          }
-        );
-        if (response?.data) {
-          console.log("response.data", response.data);
-          const imageData = response.data;
-          if (imageData?.byteLength) {
-            const blob = new Blob([imageData], { type: "image/png" });
-            this.companies_[index].logo = URL.createObjectURL(blob);
-          } else {
-            console.log("không có dữ liệu hình ảnh");
-          }
-        }
-      } catch (error) {
-        console.error("Lỗi khi lấy dữ liệu hình ảnh:", error);
-      }
-    },
+    // async getImageData(company_id, index) {
+    //   try {
+    //     const imageName = `${company_id}.jpg`;
+    //     const response = await axios.get(
+    //       `${useRuntimeConfig().public.DOMAIN}/get_logo_company`,
+    //       {
+    //         responseType: "arraybuffer", // Cho phép nhận dữ liệu nhị phân (binary data)
+    //         params: { imageName: imageName },
+    //       }
+    //     );
+    //     if (response?.data) {
+    //       console.log("response.data", response.data);
+    //       const imageData = response.data;
+    //       if (imageData?.byteLength) {
+    //         const blob = new Blob([imageData], { type: "image/png" });
+    //         this.companies_[index].logo = URL.createObjectURL(blob);
+    //       } else {
+    //         console.log("không có dữ liệu hình ảnh");
+    //       }
+    //     }
+    //   } catch (error) {
+    //     console.error("Lỗi khi lấy dữ liệu hình ảnh:", error);
+    //   }
+    // },
   },
 };
 </script>

@@ -1,0 +1,7 @@
+DOMAIN = 'http://localhost:8082'
+SECRET_KEY = 'Admin@321'
+REFRESS_SECRET_KEY = 'Admin@123'
+DOMAIN_WEB = 'http://localhost:3000'
+DOMAIN_SERVER = 'http://localhost:8082'
+ENDPOINT_HASURA = 'https://s-deal-app.hasura.app/v1/graphql'
+X_HASURA_ADMIN_SECRET = 'Dx7ZGDCbTd3URW4Csh42UrkZTllgjLtmbBQ3TR5Gh8Ze34qXKFWYKjcCdwO2Nemr'

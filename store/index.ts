@@ -107,6 +107,7 @@ export const useFiltersStore = defineStore('filterStore', () => {
   const data = ref({
     // =====Variables
     user: {
+      id: null,
       permission: null,
       company_id: null,
     },
@@ -290,7 +291,7 @@ export const useFiltersStore = defineStore('filterStore', () => {
       state.value.dialogAppointment = false;
     } else {
       state.value.snackbar.text =
-        "Vui lòng đặt chỗ cho ít nhất 1 bệnh nhân của gói này!";
+        "Vui lòng đặt chỗ cho ít nhất 1 khách hàng của gói này!";
       state.value.snackbar.state = true;
     }
   }
@@ -489,6 +490,28 @@ export const useFiltersStore = defineStore('filterStore', () => {
     return dateConverted;
   }
 
+  function isValidTimestamp(value: string): boolean {
+    const date = new Date(value);
+    return !isNaN(date.getTime()); // Kiểm tra nếu giá trị hợp lệ
+  }
+
+  function TimestampToValDate(timestamp: string) {
+    if (!isValidTimestamp(timestamp)) {
+      return null; // Trả về null hoặc giá trị mặc định nếu không hợp lệ
+    }
+
+    const date = new Date(timestamp);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+
+    return `${day}-${month}-${year} ${hours}:${minutes}:${seconds}`;
+  }
+
   async function fetchLogin() {
     let loginToken = null;
     if (localStorage.getItem("loginToken")) {
@@ -506,8 +529,19 @@ export const useFiltersStore = defineStore('filterStore', () => {
         })
         .then((response) => {
           // this.posts = response.data;
-          if (response.data.acceptLogin) {
+          if (response.data?.acceptLogin) {
+            console.log('response.data', response.data);
+
             state.value.isLogin = true;
+          }
+          if (response.data?.verify?.permission) {
+            data.value.user.permission = response.data?.verify?.permission
+          }
+          if (response.data?.verify?.id) {
+            data.value.user.id = response.data?.verify?.id
+          }
+          if (response.data?.verify?.company_id) {
+            data.value.user.company_id = response.data?.verify?.company_id
           }
         })
         .catch((e) => {
@@ -573,7 +607,7 @@ export const useFiltersStore = defineStore('filterStore', () => {
         if (response.data?.success) {
           state.value.snackbar =
             state.value.snackbar_default;
-          state.value.snackbar.text = `Gửi email cho bệnh nhân${fullname
+          state.value.snackbar.text = `Gửi email cho khách hàng${fullname
             ? " " + fullname
             : ""
             } thành công!`;
@@ -591,7 +625,7 @@ export const useFiltersStore = defineStore('filterStore', () => {
           // thông báo không thành công
           state.value.snackbar =
             state.value.snackbar_error;
-          state.value.snackbar.text = `Gửi email cho bệnh nhân${fullname
+          state.value.snackbar.text = `Gửi email cho khách hàng${fullname
             ? " " + fullname
             : ""
             } không thành công!`;
@@ -612,7 +646,7 @@ export const useFiltersStore = defineStore('filterStore', () => {
         // thông báo không thành công
         state.value.snackbar =
           state.value.snackbar_error;
-        state.value.snackbar.text = `Gửi email cho bệnh nhân${fullname
+        state.value.snackbar.text = `Gửi email cho khách hàng${fullname
           ? " " + fullname
           : ""
           } không thành công!`;
@@ -626,31 +660,104 @@ export const useFiltersStore = defineStore('filterStore', () => {
     }
   }
 
-  async function sendSMS(headers: object, phone_number: string, fullname: string, request_id: string) {
+  async function sendEmail2(headers: object, email: string, fullname: string, id_patient: string, date: string, session_name: string) {
     console.log('headers', headers);
-
+    let short_url = ''
+    let original_url = ''
     await axios
-      .post(`${useRuntimeConfig().public.DOMAIN}/send-sms`, {
-        phone_number: phone_number,
+      .post(`${useRuntimeConfig().public.DOMAIN}/send-email-2`, {
+        variable: email,
+        date: date,
+        session_name: session_name,
+        fullname: fullname,
+        id_patient: id_patient,
         headers,
-        request_id: `appointment-${request_id}`
       })
-      .then((response) => {
+      .then(async (response) => {
         if (response.data?.success) {
           state.value.snackbar =
             state.value.snackbar_default;
-          state.value.snackbar.text = `Gửi SMS cho bệnh nhân${fullname
+          state.value.snackbar.text = `Gửi email cho khách hàng${fullname
             ? " " + fullname
             : ""
             } thành công!`;
           state.value.snackbar.timeout = 3500;
           state.value.snackbar.state = true;
           console.log("response.data", response.data);
+          console.log('response.data.original_url', response.data.original_url);
+          console.log('response.data.link', response.data.short_url);
+          const what = response.data.short_url ? 'true' : 'false'
+          console.log('what', what);
+          short_url = response.data.short_url
+          original_url = response.data.original_url
+          data.value.links += ',' + response.data.short_url
         } else {
           // thông báo không thành công
           state.value.snackbar =
             state.value.snackbar_error;
-          state.value.snackbar.text = `Gửi SMS cho bệnh nhân${fullname
+          state.value.snackbar.text = `Gửi email cho khách hàng${fullname
+            ? " " + fullname
+            : ""
+            } không thành công!`;
+          state.value.snackbar.state = true;
+          return 0
+        }
+        // if (phone_number) {
+        //   await sendSMS(
+        //     headers,
+        //     phone_number
+        //       ? phone_number
+        //       : "",
+        //     fullname ? fullname : ""
+        //   );
+        // }
+      })
+      .catch((err) => {
+        // thông báo không thành công
+        state.value.snackbar =
+          state.value.snackbar_error;
+        state.value.snackbar.text = `Gửi email cho khách hàng${fullname
+          ? " " + fullname
+          : ""
+          } không thành công!`;
+        state.value.snackbar.state = true;
+        console.log("lỗi gửi email cho khách hàng", err);
+        return 0
+      });
+    return {
+      short_url: short_url,
+      original_url: original_url
+    }
+  }
+
+  async function sendSMS(headers: object, phone_number: string, fullname: string, request_id: string, date: string, session_name: number, short_url: string) {
+    console.log('headers', headers);
+
+    await axios
+      .post(`${useRuntimeConfig().public.DOMAIN}/send-sms`, {
+        phone_number: phone_number,
+        headers,
+        request_id: `${request_id}`,
+        date: date,
+        shift: data.value.shift[session_name - 1]?.time,
+        short_url: short_url ? short_url : ''
+      })
+      .then((response) => {
+        if (response.data?.short_url) {
+          state.value.snackbar =
+            state.value.snackbar_default;
+          state.value.snackbar.text = `Gửi SMS cho khách hàng${fullname
+            ? " " + fullname
+            : ""
+            } thành công!`;
+          state.value.snackbar.timeout = 5000;
+          state.value.snackbar.state = true;
+          console.log("response.data", response.data);
+        } else {
+          // thông báo không thành công
+          state.value.snackbar =
+            state.value.snackbar_error;
+          state.value.snackbar.text = `Gửi SMS cho khách hàng${fullname
             ? " " + fullname
             : ""
             } không thành công!`;
@@ -660,18 +767,92 @@ export const useFiltersStore = defineStore('filterStore', () => {
       .catch((err) => {
         // thông báo không thành công
         state.value.snackbar = state.value.snackbar_error;
-        state.value.snackbar.text = `Gửi SMS cho bệnh nhân${fullname
+        state.value.snackbar.text = `Lỗi khi gửi SMS cho khách hàng${fullname
           ? " " + fullname
           : ""
-          } không thành công!`;
+          }!`;
         state.value.snackbar.state = true;
         console.log("lỗi gửi SMS cho bệnh nhận", err);
       });
   }
 
+  async function sendSMSUpdate(headers: object, phone_number: string, fullname: string, request_id: string, date: string, session_name: number, short_url: string) {
+    console.log('headers', headers);
+
+    await axios
+      .post(`${useRuntimeConfig().public.DOMAIN}/send-sms-update`, {
+        phone_number: phone_number,
+        headers,
+        request_id: `${request_id}`,
+        date: date,
+        shift: data.value.shift[session_name - 1]?.time,
+        short_url: short_url ? short_url : ''
+      })
+      .then((response) => {
+        console.log("response", response);
+        if (response.data?.sms_now) {
+          state.value.snackbar =
+            state.value.snackbar_default;
+          state.value.snackbar.text = `Gửi SMS cho khách hàng${fullname
+            ? " " + fullname
+            : ""
+            } thành công!`;
+          state.value.snackbar.timeout = 3500;
+          state.value.snackbar.state = true;
+          console.log("response.data sms update", response.data);
+        } else {
+          // thông báo không thành công
+          state.value.snackbar =
+            state.value.snackbar_error;
+          state.value.snackbar.text = `Gửi SMS cho khách hàng${fullname
+            ? " " + fullname
+            : ""
+            } không thành công!`;
+          state.value.snackbar.state = true;
+        }
+      })
+      .catch((err) => {
+        // thông báo không thành công
+        state.value.snackbar = state.value.snackbar_error;
+        state.value.snackbar.text = `Lỗi khi gửi SMS cho khách hàng${fullname
+          ? " " + fullname
+          : ""
+          }!`;
+        state.value.snackbar.state = true;
+        console.log("lỗi gửi SMS cho khách hàng", err);
+      });
+  }
+
+
+  function excelSerialToDate(serial: number) {
+    const utc_days = Math.floor(serial - 25569);
+    const utc_value = utc_days * 86400;
+    const date_info = new Date(utc_value * 1000);
+
+    const fractional_day = serial - Math.floor(serial) + 0.0000001;
+
+    let total_seconds = Math.floor(86400 * fractional_day);
+
+    const seconds = total_seconds % 60;
+    total_seconds -= seconds;
+
+    const hours = Math.floor(total_seconds / (60 * 60));
+    const minutes = Math.floor(total_seconds / 60) % 60;
+
+    return new Date(
+      date_info.getFullYear(),
+      date_info.getMonth(),
+      date_info.getDate()
+    );
+  }
+
   return {
-    sendEmail, sendSMS,
-    ValDateToDataDate, DataDateToValDate, ExcelDateToDataDate,
+    excelSerialToDate,
+    sendEmail, sendEmail2, sendSMS, sendSMSUpdate,
+
+    ValDateToDataDate, DataDateToValDate,
+    ExcelDateToDataDate, TimestampToValDate,
+
     createPackageSchedule, updatePakageSchedule,
     browsePack, deleteSessionPack,
     updatePackInfo,

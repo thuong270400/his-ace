@@ -198,6 +198,9 @@ export default {
           if (data?.data?.ToKen) {
             localStorage.setItem("loginToken", data.data.ToKen);
           }
+          if (data?.data?.id) {
+            this.store.data.user.id = data.data.id;
+          }
           if (data?.data?.permission) {
             this.store.data.user.permission = data.data.permission;
           }

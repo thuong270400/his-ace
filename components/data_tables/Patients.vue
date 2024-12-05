@@ -32,16 +32,40 @@
         ></v-text-field>
       </v-col>
       <v-col cols="auto">
-        <v-tooltip text="Xuất danh sách bệnh nhân (gửi mail)" location="top">
+        <v-tooltip
+          text="Xuất danh sách khách hàng và đường link"
+          location="top"
+        >
           <template v-slot:activator="{ props }">
             <v-btn
               v-bind="props"
               icon="mdi-microsoft-excel"
               size="large"
               class="btn_add_schedule"
-              @click="exportToExcel()"
+              @click="
+                pack_info?.appointment_company_service_packs?.length > 0
+                  ? exportToExcel(pack_info)
+                  : (dialogCanNotChooseSendMultiple = true)
+              "
             ></v-btn> </template
         ></v-tooltip>
+      </v-col>
+      <v-col cols="auto">
+        <v-tooltip text="Gửi SMS cho khách hàng" location="top">
+          <template v-slot:activator="{ props }">
+            <v-btn
+              v-bind="props"
+              class="btn_add_schedule"
+              @click="
+                pack_info?.appointment_company_service_packs?.length > 0
+                  ? (dialogChooseSendMultiple = true)
+                  : (dialogCanNotChooseSendMultiple = true)
+              "
+              style="margin-top: 10px"
+              ><b>Gửi</b></v-btn
+            >
+          </template>
+        </v-tooltip>
       </v-col>
       <!-- <v-col cols="auto" style="text-align: right">
         <v-btn color="primary" dark class="mb-2" @click="addPatient">
@@ -115,6 +139,113 @@
     </template>
   </v-data-table>
 
+  <!-- Dialog xác nhận gửi SMS cho các khách hàng của gói -->
+  <v-dialog v-model="dialogAcceptSendMultiSMS" width="auto">
+    <v-card style="text-align: center">
+      <v-card-text>
+        Xác nhận gửi
+        <b>{{
+          type === "S"
+            ? "SMS"
+            : type === "E"
+            ? "Email"
+            : type === "ES"
+            ? "SMS và Email"
+            : ""
+        }}</b>
+        cho các bệnh nhân{{ pack_info?.name ? ` của gói ` : "" }}
+        <b> {{ pack_info?.name ? pack_info?.name : "" }} </b>?
+      </v-card-text>
+      <v-card-actions>
+        <v-spacer></v-spacer>
+        <v-btn
+          color="blue-darken-1"
+          variant="text"
+          @click="dialogAcceptSendMultiSMS = false"
+        >
+          Đóng
+        </v-btn>
+        <v-spacer></v-spacer>
+        <v-btn color="blue-darken-1" variant="text" @click="sendMultiSMS()">
+          Xác nhận
+        </v-btn>
+        <v-spacer></v-spacer>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- Thông báo không thể gửi tin nhắn vì gói chưa được xếp lịch -->
+  <v-dialog v-model="dialogCanNotChooseSendMultiple" width="auto">
+    <v-card style="text-align: center">
+      <v-card-text>
+        Vui lòng liên hệ phòng Khám Sức Khỏe Doanh Nghiệp để duyệt lịch khám!
+      </v-card-text>
+      <v-card-actions>
+        <v-spacer></v-spacer>
+        <v-btn
+          color="blue-darken-1"
+          variant="text"
+          @click="dialogCanNotChooseSendMultiple = false"
+        >
+          Đóng
+        </v-btn>
+        <v-spacer></v-spacer>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+  <!-- Dialog lựa chọn phương thức gửi thông báo -->
+  <v-dialog v-model="dialogChooseSendMultiple" width="auto">
+    <v-card style="text-align: center">
+      <v-card-text>
+        Chọn phương thức gửi thông báo cho các khách hàng{{
+          pack_info?.name ? ` của gói ` : ""
+        }}
+        <b> {{ pack_info?.name ? pack_info?.name : "" }} </b>?
+      </v-card-text>
+      <v-card-actions>
+        <v-spacer></v-spacer>
+        <v-btn
+          color="blue-darken-1"
+          variant="text"
+          @click="dialogChooseSendMultiple = false"
+        >
+          Đóng
+        </v-btn>
+        <v-spacer></v-spacer>
+        <v-btn color="blue-darken-1" variant="text" @click="sendMultiSMS()">
+          Gửi
+        </v-btn>
+        <v-spacer></v-spacer>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- Dialog xác nhận gửi email -->
+  <!-- <v-dialog v-model="dialogAcceptSendMultiSMS" width="auto">
+    <v-card style="text-align: center">
+      <v-card-text>
+        Xác nhận gửi <b>Email</b> cho các bệnh nhân{{
+          pack_info?.name ? ` của gói ` : ""
+        }}
+        <b> {{ pack_info?.name ? pack_info?.name : "" }} </b>?
+      </v-card-text>
+      <v-card-actions>
+        <v-spacer></v-spacer>
+        <v-btn
+          color="blue-darken-1"
+          variant="text"
+          @click="dialogAcceptSendMultiSMS = false"
+        >
+          Đóng
+        </v-btn>
+        <v-spacer></v-spacer>
+        <v-btn color="blue-darken-1" variant="text" @click="sendMultiSMS()">
+          Xác nhận
+        </v-btn>
+        <v-spacer></v-spacer>
+      </v-card-actions>
+    </v-card>
+  </v-dialog> -->
   <!-- Dialog xem buổi khám bệnh nhân đã đặt -->
   <v-dialog v-model="dialogSeenItem" max-width="700px">
     <v-card>
@@ -183,8 +314,10 @@
             <v-col cols="12" sm="12" md="6" class="col-style">
               <v-text-field
                 v-model="editedItem.phone_number"
+                :rules="phoneNumberRule"
                 variant="outlined"
                 color="#9b735e"
+                maxlength="11"
                 label="Số điện thoại"
               ></v-text-field>
             </v-col>
@@ -199,6 +332,7 @@
             <v-col cols="12" class="col-style">
               <v-text-field
                 v-model="editedItem.email"
+                :rules="emailRules"
                 variant="outlined"
                 color="#9b735e"
                 label="Email"
@@ -240,7 +374,11 @@
         <v-btn color="blue-darken-1" variant="text" @click="dialog = false">
           Cancel
         </v-btn>
-        <v-btn color="blue-darken-1" variant="text" @click="save()">
+        <v-btn
+          color="blue-darken-1"
+          variant="text"
+          @click="dialogUpdateOrNotic = true"
+        >
           Save
         </v-btn>
       </v-card-actions>
@@ -320,6 +458,33 @@
     </v-card>
   </v-dialog>
 
+  <!-- dialog lựa chọn gửi sms hay chỉ lưu update -->
+  <v-dialog v-model="dialogUpdateOrNotic" width="auto">
+    <v-card>
+      <v-card-text>
+        <v-container style="text-align: center">
+          Xác nhận cập nhật thông tin bệnh nhân
+        </v-container>
+      </v-card-text>
+      <v-card-actions>
+        <v-spacer></v-spacer>
+        <v-btn color="blue-darken-1" variant="text" @click="save()">Lưu</v-btn>
+        <v-spacer></v-spacer>
+        <v-btn color="blue-darken-1" variant="text" @click="save('SMS')"
+          >Lưu và gửi SMS</v-btn
+        >
+        <v-spacer></v-spacer>
+        <v-btn
+          color="blue-darken-1"
+          variant="text"
+          @click="dialogUpdateOrNotic = false"
+          >Đóng</v-btn
+        >
+        <v-spacer></v-spacer>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
   <Snackbar />
   <ProgressCircular />
   <SingleProgressCircular />
@@ -336,6 +501,7 @@ import * as XLSX from "xlsx";
 export default {
   name: "PatientPage",
   props: {
+    pack_info: {},
     pack_id: {},
     is_follow_pack: false,
   },
@@ -346,6 +512,31 @@ export default {
   },
   data() {
     return {
+      // rule
+
+      // ===rules
+      phoneNumberRule: [
+        (v) => {
+          if (v) {
+            if (/^[Z0-9-()]+(\s+[Z0-9-()]+)*$/.test(v)) {
+              if (v[0] === "0" && (v.length === 11 || v.length === 10)) {
+                return true;
+              }
+              return "sdt phải có 10 số. Vd: 07012345678";
+            } else {
+              return "Không được có khoảng trắng và kí tự";
+            }
+          }
+          return true;
+        },
+      ],
+      emailRules: [
+        (v) =>
+          !v ||
+          /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,4})+$/.test(v) ||
+          "email phải đúng định dạng. vd: nvmau@gmail.com",
+      ],
+
       // loader
       circle_loader: {
         state: false,
@@ -358,14 +549,22 @@ export default {
       },
 
       // orther
+      url: null,
       fetching: false,
       store: storeToRefs(useFiltersStore()),
       filtersStore: useFiltersStore(),
       overlay: false,
       formTitle: null,
+
       dialog: false,
       dialogSeenItem: false,
       dialogDelete: false,
+      dialogUpdateOrNotic: false,
+      dialogAcceptSendMultiSMS: false,
+      dialogChooseSendMultiple: false,
+      dialogCanNotChooseSendMultiple: false,
+
+      type_send_multiple: null,
       search: "",
       editedIndex: -1,
       editedItem: {
@@ -464,6 +663,87 @@ export default {
   },
 
   methods: {
+    chooseSendMultiple(type) {
+      this.type_send_multiple = type;
+      this.dialogAcceptSendMultiSMS = true;
+    },
+    async sendMultiSMS() {
+      this.single_circle_loader.icon = "mdi-content-save-settings";
+      this.single_circle_loader.title = "Đang thực hiện...";
+      this.single_circle_loader.state = true;
+      const headers = {
+        authentication: localStorage.getItem("loginToken")
+          ? localStorage.getItem("loginToken")
+          : "",
+      };
+      if (this.patients_.length > 0) {
+        for (let index = 0; index < this.patients_.length; index++) {
+          if (this.patients_[index]?.phone_number) {
+            this.single_circle_loader.title = `Đang gửi SMS cho khách hàng${
+              this.patients_[index]?.fullname
+                ? " " + this.patients_[index].fullname
+                : ""
+            }!`;
+            try {
+              await this.delay(2000);
+              await this.filtersStore.sendSMS(
+                headers,
+                this.patients_[index]?.phone_number
+                  ? this.patients_[index].phone_number
+                  : "",
+                this.patients_[index]?.fullname
+                  ? this.patients_[index].fullname
+                  : "",
+                this.patients_[index]?.id ? `${this.patients_[index].id}` : "0",
+                this.patients_[index]?.date
+                  ? this.filtersStore.DataDateToValDate(
+                      this.patients_[index].date
+                    )
+                  : "",
+                this.patients_[index].session_name
+                  ? this.patients_[index].session_name
+                  : 0
+              );
+            } catch (error) {
+              console.log("lỗi gửi sms", error);
+            }
+          }
+          // if (this.patients_[index]?.email) {
+          //   this.single_circle_loader.title = `Đang gửi SMS cho khách hàng${
+          //     this.patients_[index]?.fullname
+          //       ? " " + this.patients_[index].fullname
+          //       : ""
+          //   }!`;
+          //   try {
+          //     await this.delay(2000);
+          //     await this.filtersStore.sendEmail2(
+          //       headers,
+          //       this.patients_[index]?.email ? this.patients_[index].email : "",
+          //       this.patients_[index]?.fullname
+          //         ? this.patients_[index].fullname
+          //         : "",
+          //       this.patients_[index]?.id ? `${this.patients_[index].id}` : "0",
+          //       this.patients_[index]?.date
+          //         ? this.filtersStore.DataDateToValDate(
+          //             this.patients_[index].date
+          //           )
+          //         : "",
+          //       this.patients_[index].session_name
+          //         ? this.patients_[index].session_name
+          //         : 0
+          //     );
+          //   } catch (error) {
+          //     console.log("lỗi gửi email", error);
+          //   }
+          // }
+        }
+      }
+      this.dialogAcceptSendMultiSMS = false;
+      // Đóng circle load
+      this.single_circle_loader.state = false;
+      this.single_circle_loader.icon = "";
+      this.single_circle_loader.title = "";
+    },
     fetchHeader() {
       if (
         this.store.data.user.permission !== "admin" &&
@@ -510,10 +790,7 @@ export default {
           });
       }
       // admin xem bệnh nhân
-      else if (
-        this.store.data.user.permission === "admin" ||
-        this.store.data.user.permission === "KD"
-      ) {
+      else if (this.store.data.user.permission === "admin") {
         response = await axios
           .get(`${useRuntimeConfig().public.DOMAIN}/select-patients`, {
             params: {
@@ -526,7 +803,7 @@ export default {
           });
       }
       // manager xem bệnh nhân
-      else if (this.store.data.user.permission === "KH") {
+      else if (this.store.data.user.permission === "KD") {
         response = await axios
           .get(`${useRuntimeConfig().public.DOMAIN}/select-patients-manager`, {
             params: {
@@ -664,7 +941,7 @@ export default {
       this.fetching = false;
     },
 
-    exportToExcel() {
+    exportToExcel(pack_info) {
       // Dữ liệu bạn muốn xuất ra Excel
       const data = [
         // Thêm dữ liệu khác nếu cần
@@ -725,7 +1002,12 @@ export default {
       XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
 
       // Xuất file Excel
-      XLSX.writeFile(wb, "data.xls");
+      XLSX.writeFile(
+        wb,
+        `Danh sách khách hàng${
+          this.pack_info?.name ? ` gói ${this.pack_info.name}` : ""
+        }.xls`
+      );
     },
     dataTableStyle() {
       if (this.store.state.isLogin) {
@@ -914,23 +1196,48 @@ export default {
           console.log("Xóa không thành công", e);
         });
     },
-
-    async save() {
+    delay(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    },
+    async save(notic) {
       console.log("save: set object", this.editedIndex);
       // kiểm tra field nhập
       if (!this.editedItem.fullname) {
         this.store.state.snackbar.text = "Tên bệnh nhân không được để trống!";
         this.store.state.snackbar.state = true;
-      } else if (!this.editedItem.phone_number) {
+      } else if (!this.editedItem.phone_number && !this.editedItem.email) {
         this.store.state.snackbar.text =
-          "Số điện thoại bệnh nhân không được để trống!";
+          "Bệnh nhân phải có số điện thoại hoặc email";
+        this.store.state.snackbar.state = true;
+      } else if (
+        this.editedItem.phone_number &&
+        !/^[Z0-9-()]+(\s+[Z0-9-()]+)*$/.test(this.editedItem.phone_number)
+      ) {
+        this.store.state.snackbar.text = "Số điện thoại phải là số";
+        this.store.state.snackbar.state = true;
+      } else if (
+        this.editedItem.phone_number &&
+        !(
+          this.editedItem.phone_number[0] === "0" &&
+          (this.editedItem.phone_number.length === 11 ||
+            this.editedItem.phone_number.length === 10)
+        )
+      ) {
+        this.store.state.snackbar.text =
+          "Sđt phải có 10 hoặc 11 số và bắt đầu từ 0. Vd: 07012345678";
         this.store.state.snackbar.state = true;
       } else if (!this.editedItem.birthday) {
         this.store.state.snackbar.text =
           "Ngày sinh bệnh nhân không được để trống!";
         this.store.state.snackbar.state = true;
-      } else if (!this.editedItem.email) {
-        this.store.state.snackbar.text = "Email bệnh nhân không được để trống!";
+      } else if (
+        this.editedItem.email &&
+        !/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,4})+$/.test(
+          this.editedItem.email
+        )
+      ) {
+        this.store.state.snackbar.text =
+          "email phải đúng định dạng. vd: nvmau@gmail.com";
         this.store.state.snackbar.state = true;
       } else {
         this.single_circle_loader.icon = "mdi-content-save-settings";
@@ -994,6 +1301,76 @@ export default {
                     "Cập nhật bệnh nhân thành công!";
                   this.store.state.snackbar.timeout = 3500;
                   this.store.state.snackbar.state = true;
+
+                  // Gửi email, sms cho bệnh nhân
+                  const headers = {
+                    authentication: localStorage.getItem("loginToken")
+                      ? localStorage.getItem("loginToken")
+                      : "",
+                  };
+                  const foundObject = this.edited_session_packs_.find(
+                    (item) =>
+                      Number(item.session_id) === Number(Patient.session_id)
+                  );
+                  if (Patient.email) {
+                    try {
+                      this.single_circle_loader.title = `Đang tạo mới đường dẫn cho khách hàng${
+                        Patient.fullname ? " " + Patient.fullname : ""
+                      }!`;
+
+                      // gửi email cho bệnh nhân
+                      this.url = await this.filtersStore.sendEmail(
+                        headers,
+                        Patient.email ? Patient.email : "",
+                        Patient.fullname ? Patient.fullname : "",
+                        Patient.phone_number ? Patient.phone_number : "",
+                        Patient.id
+                      );
+                      this.dialogUpdateOrNotic = true;
+                      if (Patient.phone_number && notic && notic === "SMS") {
+                        // gửi sms cho bệnh nhân
+                        this.single_circle_loader.title = `Đang gửi SMS cho khách hàng${
+                          Patient.fullname ? " " + Patient.fullname : ""
+                        }!`;
+                        await this.delay(1000);
+                        await this.filtersStore.sendSMSUpdate(
+                          headers,
+                          Patient.phone_number ? Patient.phone_number : "",
+                          Patient.fullname ? Patient.fullname : "",
+                          Patient.id ? `${Patient.id}` : "0",
+                          foundObject?.date ? foundObject.date : null,
+                          foundObject?.session_name
+                            ? foundObject.session_name
+                            : 0,
+                          this.url?.short_url ? this.url.short_url : ""
+                        );
+                      }
+                    } catch (error) {
+                      // thông báo không thành công
+                      this.store.state.snackbar =
+                        this.store.state.snackbar_error;
+                      this.store.state.snackbar.text = `Lỗi khi gửi thông báo cho bệnh nhân${
+                        Patient.fullname ? " " + Patient.fullname : ""
+                      }!`;
+                      this.store.state.snackbar.state = true;
+
+                      console.log("lỗi", error);
+                    }
+                  } else if (Patient.phone_number && notic && notic === "SMS") {
+                    // gửi sms cho bệnh nhân
+                    await this.delay(2000);
+                    this.single_circle_loader.title = `Đang gửi SMS cho khách hàng${
+                      Patient.fullname ? " " + Patient.fullname : ""
+                    }!`;
+                    await this.filtersStore.sendSMSUpdate(
+                      headers,
+                      Patient.phone_number ? Patient.phone_number : "",
+                      Patient.fullname ? Patient.fullname : "",
+                      Patient.id ? `${Patient.id}` : "0",
+                      foundObject?.date ? foundObject.date : null,
+                      foundObject?.session_name ? foundObject.session_name : 0
+                    );
+                  }
                 } else {
                   this.store.state.snackbar = this.store.state.snackbar_default;
                   this.store.state.snackbar.text = "Cập nhật không thành công!";
@@ -1057,6 +1434,7 @@ export default {
         this.single_circle_loader.icon = "";
         this.single_circle_loader.title = "";
         this.dialog = false;
+        this.dialogUpdateOrNotic = false;
       }
     },
   },

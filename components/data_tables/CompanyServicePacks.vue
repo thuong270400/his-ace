@@ -129,6 +129,9 @@
         >
           Đã duyệt
         </span>
+        <br />
+        (<b>SL:</b>
+        {{ sumAmountAppointment(item.appointment_company_service_packs) }})
       </div>
     </template>
     <template v-slot:item.actions="{ item }">
@@ -216,7 +219,11 @@
       <tr>
         <td :colspan="columns.length">
           <v-card class="mx-auto ma-2" style="background-color: #cedee7">
-            <Patients :pack_id="item.id" :is_follow_pack="true" />
+            <Patients
+              :pack_info="item"
+              :pack_id="item.id"
+              :is_follow_pack="true"
+            />
           </v-card>
         </td>
       </tr>
@@ -310,7 +317,6 @@
               label="Giá gói khám"
               color="#4da1eb"
               variant="outlined"
-              :rules="[numberRule]"
             >
             </v-text-field>
           </v-col>
@@ -384,7 +390,35 @@
       </div>
     </v-card>
   </v-dialog>
-  <v-dialog v-model="dialogLinkList">
+  <v-dialog persistent v-model="dialogNonePhoneAndMail" width="auto">
+    <v-card>
+      <v-card-title style="text-align: center">
+        <h2>Danh sách bệnh nhân không có cả email và số điện thoại</h2>
+      </v-card-title>
+      <v-card-text>
+        <v-container>
+          <v-row justify="center" style="text-align: center">
+            <v-col cols="12" v-for="(item, i) in nonePhoneAndMail" :key="i">
+              Tên: {{ item?.fullname ? item?.fullname : "" }} - Ngày sinh
+              {{ item?.birthday ? item.birthday : "" }}
+            </v-col>
+          </v-row>
+        </v-container>
+      </v-card-text>
+      <v-card-actions>
+        <v-spacer></v-spacer>
+        <v-btn
+          color="blue-darken-1"
+          variant="text"
+          @click="dialogNonePhoneAndMail = false"
+        >
+          Đóng
+        </v-btn>
+        <v-spacer></v-spacer>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+  <!-- <v-dialog v-model="dialogLinkList">
     <v-card>
       <v-card-text>
         <span v-for="(item, i) in short_urls" :key="i"> {{ item }}<br /></span>
@@ -395,6 +429,49 @@
           {{ item }}<br />
         </span>
       </v-card-text>
+    </v-card>
+  </v-dialog> -->
+  <v-dialog
+    v-if="incorrectPatients.length > 0"
+    persistent
+    v-model="dialogIncorrectPatient"
+    width="auto"
+  >
+    <v-card class="mx-auto ma-2 pa-2">
+      <v-card-title style="text-align: center">
+        <h3>DANH SÁCH BỆNH NHÂN CHƯA KHỚP LỊCH HẸN CỦA GÓI KHÁM</h3>
+        <b
+          >(trường <span style="color: red">bôi đỏ</span> là trường chưa
+          khớp)</b
+        >
+      </v-card-title>
+      <v-card-text>
+        <v-container>
+          <v-row justify="center">
+            <v-col cols="12" v-for="(item, i) in incorrectPatients" :key="i">
+              Bệnh nhân: {{ item.fullname }} -
+              <span :style="incorrectPatientStyle(item.isDateFall)">
+                Ngày hẹn trên excel:
+                {{ item.date ? filtersStore.DataDateToValDate(item.date) : "" }}
+              </span>
+              -
+              <span :style="incorrectPatientStyle(item.isSessionFall)">
+                Khung giờ: {{ item.session }}
+              </span>
+            </v-col>
+          </v-row>
+        </v-container>
+      </v-card-text>
+      <v-card-actions>
+        <v-spacer></v-spacer>
+        <v-btn
+          color="blue-darken-1"
+          variant="text"
+          @click="dialogIncorrectPatient = false"
+          >Đóng</v-btn
+        >
+        <v-spacer></v-spacer>
+      </v-card-actions>
     </v-card>
   </v-dialog>
 
@@ -410,10 +487,10 @@ import axios from "axios";
 import { useFiltersStore } from "~/store/index.ts";
 import { storeToRefs } from "pinia";
 import * as XLSX from "xlsx";
+import numeral from "numeral";
 import Snackbar from "../utilities/Snackbar.vue";
 import ProgressCircular from "../utilities/ProgressCircular.vue";
 import SingleProgressCircular from "../utilities/SingleProgressCircular.vue";
-import PatientsOfPack from "./PatientsOfPack.vue";
 import Patients from "./Patients.vue";
 import DialogAppointment from "../dialogs/DialogApointment.vue";
 import DialogBrowsePackages from "../dialogs/DialogBrowsePackages.vue";
@@ -429,7 +506,6 @@ export default {
     Snackbar,
     ProgressCircular,
     SingleProgressCircular,
-    PatientsOfPack,
     Patients,
     DialogAppointment,
     DialogBrowsePackages,
@@ -444,10 +520,13 @@ export default {
     dialogImport: false,
     dialogEdit: false,
     dialogLinkList: false,
+    dialogIncorrectPatient: false,
+    dialogNonePhoneAndMail: false,
 
     short_urls: [],
     original_urls: [],
     expanded: [],
+    incorrectPatients: [],
 
     // loader
     circle_loader: {
@@ -468,17 +547,7 @@ export default {
     filtersStore: useFiltersStore(),
     search: "",
     editedPackageIndex: -1,
-
-    numberRule: (v) => {
-      if (v) {
-        if (/^[0-9-/]*$/.test(v)) {
-          return true;
-        } else {
-          return "Không được có khoảng trắng và kí tự";
-        }
-      }
-      return "Vui lòng nhập giá trị";
-    },
+    nonePhoneAndMail: [],
 
     // --array variable
     headers: [
@@ -488,12 +557,13 @@ export default {
         sortable: false,
         title: "STT",
       },
+      { key: "company.name", title: "Tên công ty" },
       { key: "name", title: "Tên gói khám" },
       { key: "number_of_employees", title: "Số lượng người tham gia" },
       { key: "price", title: "Giá gói khám" },
       { key: "register_year", title: "Năm" },
       { key: "schedules", title: "Lịch khám" },
-      { key: "status", title: "Trạng thái" },
+      { key: "status", title: "Trạng thái\n(Tổng đặt)" },
       { title: "Actions", key: "actions", sortable: false },
     ],
     packages_: [
@@ -601,6 +671,12 @@ export default {
   },
 
   watch: {
+    "editedPackage.price"() {
+      // Định dạng giá tiền với dấu phẩy ở hàng nghìn, triệu, tỷ, v.v.
+      this.editedPackage.price = numeral(this.editedPackage.price).format(
+        "0,0"
+      );
+    },
     // async "store.state.isLogin"() {
     //   if (this.store.state.isLogin) {
     //     await this.fetchFirstData();
@@ -608,10 +684,8 @@ export default {
     // },
 
     async "store.data.user.permission"(newVal, oldVal) {
-      if (newVal) {
-        console.log("load lại pack_ theo permission");
-        await this.fetchFirstData();
-      }
+      console.log("load lại pack_ theo permission");
+      await this.fetchFirstData();
     },
 
     async "store.state.isReFetch"(newVal, oldVal) {
@@ -643,11 +717,26 @@ export default {
         this.store.state.isUpdatedPakageSchedule = false;
       }
     },
-    "store.data.user.permission"(newVal, oldVal) {
-      this.fetchFirstData();
-    },
   },
   methods: {
+    sumAmountAppointment(item) {
+      let count = 0;
+      for (let index = 0; index < item.length; index++) {
+        count += Number(item[index].total_slot);
+      }
+      return count;
+    },
+    incorrectPatientStyle(isFall) {
+      if (isFall) {
+        return `
+        font-weight: bold;
+        color: red`;
+      } else {
+        return `
+        font-weight: bold;
+        color: black`;
+      }
+    },
     initialize() {
       this.fetchFirstData();
     },
@@ -665,6 +754,11 @@ export default {
       }
     },
     async fetchFirstData() {
+      const headers = {
+        authentication: localStorage.getItem("loginToken")
+          ? localStorage.getItem("loginToken")
+          : "",
+      };
       this.fetchHeader();
       this.fetching = true;
       this.circle_loader.icon = "mdi-medical-bag";
@@ -674,6 +768,7 @@ export default {
         response = await axios
           .get(`${useRuntimeConfig().public.DOMAIN}/select-packs-of-company`, {
             params: {
+              headers,
               company_id: this.company_id,
             },
           })
@@ -682,18 +777,22 @@ export default {
           });
       } else if (
         this.store.data.user.permission === "admin" ||
-        this.store.data.user.permission === "LH" ||
-        this.store.data.user.permission === "KD"
+        this.store.data.user.permission === "LH"
       ) {
         // console.log("admin packs");
         response = await axios
           .get(
-            `${useRuntimeConfig().public.DOMAIN}/select-company-service-packs`
+            `${useRuntimeConfig().public.DOMAIN}/select-company-service-packs`,
+            {
+              params: {
+                headers,
+              },
+            }
           )
           .catch((e) => {
             console.log("không có data", e);
           });
-      } else if (this.store.data.user.permission === "KH") {
+      } else if (this.store.data.user.permission === "KD") {
         // console.log("manager packs");
         response = await axios
           .get(
@@ -702,7 +801,8 @@ export default {
             }/select-company-service-packs-manager`,
             {
               params: {
-                company_id: this.store.data.user.company_id,
+                headers,
+                id: this.store.data.user.id,
               },
             }
           )
@@ -719,6 +819,9 @@ export default {
           let stt = 0;
           for (let index = 0; index < this.packages_.length; index++) {
             this.packages_[index].stt = ++stt;
+            this.packages_[index].price = numeral(
+              this.packages_[index].price
+            ).format("0,0");
           }
         }
       }
@@ -972,10 +1075,14 @@ export default {
               if (sheetData[index]["Số điện thoại"]) {
                 tempPatient.phone_number = sheetData[index]["Số điện thoại"];
               }
-              if (sheetData[index]["Ngày sinh"]) {
-                if (Number.isInteger(Number(sheetData[index]["Ngày sinh"]))) {
-                  const dmy = this.excelSerialToDate(
-                    Number(sheetData[index]["Ngày sinh"])
+              if (sheetData[index]["Ngày sinh(dd/mm/yyyy)"]) {
+                if (
+                  Number.isInteger(
+                    Number(sheetData[index]["Ngày sinh(dd/mm/yyyy)"])
+                  )
+                ) {
+                  const dmy = this.filtersStore.excelSerialToDate(
+                    Number(sheetData[index]["Ngày sinh(dd/mm/yyyy)"])
                   );
                   console.log(dmy);
                   console.log(dmy.getFullYear());
@@ -987,14 +1094,34 @@ export default {
                   tempPatient.birthday = `${yyyy}-${mm}-${dd}`;
                   console.log("tempPatient.birthday", tempPatient.birthday);
                 } else {
-                  tempPatient.birthday = sheetData[index]["Ngày sinh"];
+                  tempPatient.birthday =
+                    sheetData[index]["Ngày sinh(dd/mm/yyyy)"];
                 }
               }
               if (sheetData[index]["Email"]) {
                 tempPatient.email = sheetData[index]["Email"];
               }
-              if (sheetData[index]["Ngày hẹn"]) {
-                tempPatient.appointment_date = sheetData[index]["Ngày hẹn"];
+              if (sheetData[index]["Ngày hẹn(dd/mm/yyyy)"]) {
+                if (
+                  Number.isInteger(
+                    Number(sheetData[index]["Ngày hẹn(dd/mm/yyyy)"])
+                  )
+                ) {
+                  const dmy = this.filtersStore.excelSerialToDate(
+                    Number(sheetData[index]["Ngày hẹn(dd/mm/yyyy)"])
+                  );
+                  const dd = String(dmy.getDate()).padStart(2, "0");
+                  const mm = String(dmy.getMonth() + 1).padStart(2, "0");
+                  const yyyy = dmy.getFullYear();
+                  tempPatient.appointment_date = `${yyyy}-${mm}-${dd}`;
+                  console.log(
+                    "tempPatient.appointment_date",
+                    tempPatient.appointment_date
+                  );
+                } else {
+                  tempPatient.appointment_date =
+                    sheetData[index]["Ngày hẹn(dd/mm/yyyy)"];
+                }
                 if (sheetData[index]["Khung giờ"]) {
                   const findTime = this.store.data.shift.find(function (
                     element
@@ -1025,27 +1152,6 @@ export default {
       }
 
       // Thực hiện các xử lý khác dựa trên file đã chọn
-    },
-    excelSerialToDate(serial) {
-      const utc_days = Math.floor(serial - 25569);
-      const utc_value = utc_days * 86400;
-      const date_info = new Date(utc_value * 1000);
-
-      const fractional_day = serial - Math.floor(serial) + 0.0000001;
-
-      let total_seconds = Math.floor(86400 * fractional_day);
-
-      const seconds = total_seconds % 60;
-      total_seconds -= seconds;
-
-      const hours = Math.floor(total_seconds / (60 * 60));
-      const minutes = Math.floor(total_seconds / 60) % 60;
-
-      return new Date(
-        date_info.getFullYear(),
-        date_info.getMonth(),
-        date_info.getDate()
-      );
     },
     dataTableStyle() {
       if (this.store.state.isLogin) {
@@ -1089,25 +1195,13 @@ export default {
       this.editedPackage = {};
       this.editedPackage = Object.assign({}, item);
       this.dialogEdit = true;
-      // Ngày 1/7/2023 từ Excel
-      var ngayThangExcel = "1/7/2023";
-
-      // Chuyển đổi ngày tháng từ định dạng Excel sang định dạng JavaScript
-      var mangNgayThang = ngayThangExcel.split("/");
-      var ngayThangJS = new Date(
-        mangNgayThang[2],
-        mangNgayThang[1] - 1,
-        mangNgayThang[0]
-      );
-
-      // Trả về giá trị của biến A
-      // var giaTriA = ngayThangJS.getTime() / 1000; // Chia cho 1000 để chuyển từ miligiây sang giây
-
-      // In ra giá trị của biến A
-      // console.log("Giá trị của biến A: ", giaTriA / 44933);
     },
 
     async acceptUpdate() {
+      this.editedPackage.price = parseInt(
+        this.editedPackage.price.replace(/\D/g, ""),
+        10
+      );
       if (!this.editedPackage.name) {
         this.store.state.snackbar = this.store.state.snackbar_error;
         this.store.state.snackbar.text = "Không đúng định dạng!";
@@ -1204,6 +1298,10 @@ export default {
     closeImport() {
       this.dialogImport = false;
     },
+
+    delay(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    },
     async acceptImport() {
       this.single_circle_loader.icon = "mdi-content-save-settings";
       this.single_circle_loader.title = "Đang thực hiện...";
@@ -1215,6 +1313,8 @@ export default {
       ) {
         if (this.patient_?.length > 0) {
           const variables = [];
+          this.incorrectPatients = [];
+          this.nonePhoneAndMail = [];
           for (
             let indexPatient = 0;
             indexPatient < this.patient_.length;
@@ -1229,38 +1329,66 @@ export default {
               const appointment_packs =
                 this.editedPackage.appointment_company_service_packs;
               // console.log("appointment_packs", appointment_packs);
+
+              let isSessionExcelFall = true;
+              let isDateExcelFall = true;
               for (let index = 0; index < appointment_packs.length; index++) {
                 // console.log(
-                //   `appointment_packs[
-                //     index
-                //   ].appointment_session.appointment_schedule.date.toString()`,
+                //   "DataDate",
                 //   appointment_packs[
                 //     index
                 //   ].appointment_session.appointment_schedule.date.toString()
                 // );
                 // console.log(
-                //   `this.filtersStore.ValDateToDataDate(
-                //       this.patient_[indexPatient].appointment_date`,
-                //   this.filtersStore.ValDateToDataDate(
-                //     this.patient_[indexPatient].appointment_date
-                //   )
+                //   "ExcelDateToDataDate",
+                //   this.patient_[indexPatient].appointment_date
                 // );
                 // console.log(
-                //   `appointment_packs[
-                //     index
-                //   ].appointment_session.appointment_schedule.date.toString() ===
-                //     this.filtersStore.ValDateToDataDate(
-                //       this.patient_[indexPatient].appointment_date
-                //     )`,
+                //   "compare",
                 //   appointment_packs[
                 //     index
                 //   ].appointment_session.appointment_schedule.date.toString() ===
-                //     this.filtersStore.ValDateToDataDate(
-                //       this.patient_[indexPatient].appointment_date
-                //     )
-                //     ? "true"
-                //     : "false"
+                //     this.patient_[indexPatient].appointment_date
                 // );
+                // Kiểm tra buổi trong excel có bằng buổi trong gói khám hay không
+                console.log(
+                  "session in pack",
+                  appointment_packs[index].appointment_session.name.toString()
+                );
+                console.log(
+                  "session excel",
+                  this.patient_[indexPatient].session.toString()
+                );
+                console.log(
+                  "compare session",
+                  appointment_packs[
+                    index
+                  ].appointment_session.name.toString() ===
+                    this.patient_[indexPatient].session.toString()
+                );
+                // Kiểm tra ngày trong excel có bằng ngày trong gói khám hay không
+                if (
+                  (appointment_packs[
+                    index
+                  ].appointment_session.appointment_schedule.date.toString() ===
+                    this.patient_[indexPatient].appointment_date) ===
+                  true
+                ) {
+                  isDateExcelFall = false;
+                  if (
+                    !isDateExcelFall &&
+                    (appointment_packs[
+                      index
+                    ].appointment_session.name.toString() ===
+                      this.patient_[indexPatient].session.toString()) ===
+                      true
+                  ) {
+                    isSessionExcelFall = false;
+                  }
+                }
+                if (isDateExcelFall) {
+                  isSessionExcelFall = false;
+                }
                 if (
                   appointment_packs[index].appointment_session?.name &&
                   appointment_packs[
@@ -1272,9 +1400,7 @@ export default {
                   appointment_packs[
                     index
                   ].appointment_session.appointment_schedule.date.toString() ===
-                    this.filtersStore.ValDateToDataDate(
-                      this.patient_[indexPatient].appointment_date
-                    ) &&
+                    this.patient_[indexPatient].appointment_date &&
                   appointment_packs[index].appointment_session.id
                 ) {
                   console.log("trueeeeeeee!!!");
@@ -1282,13 +1408,42 @@ export default {
                     appointment_packs[index].appointment_session.id;
                 }
               }
+              if (isSessionExcelFall || isDateExcelFall) {
+                const tempPatientFall = {
+                  fullname: null,
+                  date: null,
+                  session: null,
+                  isSessionFall: false,
+                  isDateFall: false,
+                };
+                if (this.patient_[indexPatient].fullname) {
+                  tempPatientFall.fullname =
+                    this.patient_[indexPatient].fullname;
+                }
+                if (this.patient_[indexPatient].appointment_date) {
+                  tempPatientFall.date =
+                    this.patient_[indexPatient].appointment_date;
+                }
+                if (this.patient_[indexPatient].session) {
+                  tempPatientFall.session = this.patient_[indexPatient].session;
+                }
+                tempPatientFall.isSessionFall = isSessionExcelFall;
+
+                tempPatientFall.isDateFall = isDateExcelFall;
+
+                this.incorrectPatients.push(tempPatientFall);
+              }
             }
             variable.fullname = this.patient_[indexPatient].fullname;
             variable.phone_number = this.patient_[indexPatient].phone_number;
             // console.log("before val");
             variable.birthday = this.patient_[indexPatient].birthday;
             variable.email = this.patient_[indexPatient].email;
-            variables.push(variable);
+            if (variable.phone_number || variable.email) {
+              variables.push(variable);
+            } else {
+              this.nonePhoneAndMail.push(variable);
+            }
             console.log("variables", variables);
             this.dialogImport = false;
           }
@@ -1363,25 +1518,34 @@ export default {
                     this.short_urls.push(url.short_url);
                     this.original_urls.push(url.original_url);
                   }
-                  if (returning[index].phone_number) {
-                    // gửi sms cho bệnh nhân
-                    console.log("returning[index]", returning[index]);
-                    this.single_circle_loader.title = `Đang gửi SMS cho bệnh nhân${
-                      returning[index].fullname
-                        ? " " + returning[index].fullname
-                        : ""
-                    }!`;
-                    await this.filtersStore.sendSMS(
-                      headers,
-                      returning[index].phone_number
-                        ? returning[index].phone_number
-                        : "",
-                      returning[index].fullname
-                        ? returning[index].fullname
-                        : "",
-                      returning[index].id ? `${returning[index].id}` : "0"
-                    );
-                  }
+                  // if (returning[index].phone_number) {
+                  //   // gửi sms cho bệnh nhân
+                  //   console.log("returning[index]", returning[index]);
+                  //   this.single_circle_loader.title = `Đang gửi SMS cho bệnh nhân${
+                  //     returning[index].fullname
+                  //       ? " " + returning[index].fullname
+                  //       : ""
+                  //   }!`;
+                  //   await this.delay(1000);
+                  //   await this.filtersStore.sendSMS(
+                  //     headers,
+                  //     returning[index].phone_number
+                  //       ? returning[index].phone_number
+                  //       : "",
+                  //     returning[index].fullname
+                  //       ? returning[index].fullname
+                  //       : "",
+                  //     returning[index].id ? `${returning[index].id}` : "0",
+                  //     returning[index].company_service_pack
+                  //       ?.appointment_company_service_packs[0]
+                  //       ?.appointment_session?.appointment_schedule?.date
+                  //       ? returning[index].company_service_pack
+                  //           ?.appointment_company_service_packs[0]
+                  //           ?.appointment_session?.appointment_schedule?.date
+                  //       : "",
+                  //     url.short_url ? url.short_url : ""
+                  //   );
+                  // }
                 } catch (error) {
                   // thông báo không thành công
                   this.store.state.snackbar = this.store.state.snackbar_error;
@@ -1395,27 +1559,29 @@ export default {
                   console.log("lỗi", error);
                 }
               }
-              else if (returning[index].phone_number) {
-                // gửi sms cho bệnh nhân
-                console.log("returning[index]", returning[index]);
-                this.single_circle_loader.title = `Đang gửi SMS cho bệnh nhân${
-                  returning[index].fullname
-                    ? " " + returning[index].fullname
-                    : ""
-                }!`;
-                await this.filtersStore.sendSMS(
-                  headers,
-                  returning[index].phone_number
-                    ? returning[index].phone_number
-                    : "",
-                  returning[index].fullname ? returning[index].fullname : "",
-                  returning[index].id ? `${returning[index].id}` : "0"
-                );
-              }
+              // else if (returning[index].phone_number) {
+              //   // gửi sms cho bệnh nhân
+              //   await this.delay(2000);
+              //   console.log("returning[index]", returning[index]);
+              //   this.single_circle_loader.title = `Đang gửi SMS cho bệnh nhân${
+              //     returning[index].fullname
+              //       ? " " + returning[index].fullname
+              //       : ""
+              //   }!`;
+              //   await this.filtersStore.sendSMS(
+              //     headers,
+              //     returning[index].phone_number
+              //       ? returning[index].phone_number
+              //       : "",
+              //     returning[index].fullname ? returning[index].fullname : "",
+              //     returning[index].id ? `${returning[index].id}` : "0"
+              //   );
+              // }
             }
             console.log("this.short_urls", this.short_urls);
             console.log("this.original_urls", this.original_urls);
-            this.dialogLinkList = true;
+            // this.dialogLinkList = true;
+            this.dialogIncorrectPatient = true;
             console.log(
               "this.store.data.links",
               this.store.data.links.toString()
@@ -1429,6 +1595,9 @@ export default {
       this.single_circle_loader.icon = "";
       this.single_circle_loader.title = "";
       this.fetchFirstData();
+      if (this.nonePhoneAndMail?.length > 0) {
+        this.dialogNonePhoneAndMail = true;
+      }
     },
   },
 };

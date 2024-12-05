@@ -35,16 +35,17 @@
           "
           style="text-align: right"
         >
-          <v-tooltip text="Cập nhật gói khám" location="top">
+          <v-tooltip text="Lưu gói khám" location="top">
             <template v-slot:activator="{ props }">
               <v-btn
                 v-bind="props"
-                icon="mdi-reload mdi-spin"
                 size="large"
                 class="btn_add_schedule"
                 @click="dialogUpdate = true"
-              ></v-btn> </template
-          ></v-tooltip>
+                >Lưu gói khám</v-btn
+              >
+            </template></v-tooltip
+          >
         </v-col>
 
         <v-col
@@ -93,6 +94,110 @@
     </v-card-title>
     <FullCalendar :options="calendarOptions" />
   </v-card>
+
+  <!-- Dialog sửa buổi (phân quyền lịch hẹn) -->
+  <v-dialog v-model="dialogUpdateLimitSlot" width="50vw">
+    <v-card>
+      <v-card-title>
+        Chỉnh sửa giới hạn người khám<br />
+        <span style="font-size: 13px; font-weight: bold">
+          {{ session_choosed }}
+        </span>
+      </v-card-title>
+      <v-card-text>
+        <v-container>
+          <v-row>
+            <v-col cols="12">
+              <v-text-field
+                v-model="limitSlot"
+                label="Giới hạn người khám"
+                variant="outlined"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12">
+              Số lượng bệnh nhân ước tính của ca khám này:
+              {{ slot_registered_seen }}
+            </v-col>
+          </v-row>
+        </v-container>
+      </v-card-text>
+
+      <v-card-actions>
+        <v-btn
+          color="blue-darken-1"
+          variant="text"
+          @click="dialogDeleteSession = true"
+          >Xóa buổi</v-btn
+        >
+        <v-spacer></v-spacer>
+        <v-btn
+          color="blue-darken-1"
+          variant="text"
+          @click="dialogUpdateLimitSlot = false"
+        >
+          Hủy
+        </v-btn>
+        <v-btn color="blue-darken-1" variant="text" @click="updateLimitSlot">
+          Lưu
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- Dialog xác nhận xóa buổi -->
+  <v-dialog v-model="dialogDeleteSession" width="auto">
+    <v-card>
+      <v-card-text>
+        Xác nhận xóa buổi khám <b>{{ session_choosed }}?</b>
+      </v-card-text>
+      <v-card-actions>
+        <v-spacer></v-spacer>
+        <v-btn
+          color="blue-darken-1"
+          variant="text"
+          @click="dialogDeleteSession = false"
+        >
+          Đóng
+        </v-btn>
+        <v-spacer></v-spacer>
+        <v-btn
+          color="blue-darken-1"
+          variant="text"
+          @click="confirmDeleteSession"
+        >
+          Xác nhận
+        </v-btn>
+        <v-spacer></v-spacer>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- Dialog cảnh báo còn bệnh nhân -->
+  <v-dialog v-model="dialogWarningHavePerson" width="auto" max-width="45vw">
+    <v-card style="text-align: center; background-color: #faff5f">
+      <v-card-text>
+        Buổi khám
+        <b>{{ session_choosed }}</b>
+        &nbsp;<u>đã có gói khám đặt trước</u><br />
+        Vui lòng
+        <b><u>xóa</u></b> các gói khám chứa buổi khám này trước và
+        <b>thử lại sau</b>
+      </v-card-text>
+      <v-card-actions>
+        <v-spacer></v-spacer>
+        <v-btn
+          color="blue-darken-1"
+          variant="text"
+          @click="dialogWarningHavePerson = false"
+        >
+          Đóng
+        </v-btn>
+        <v-spacer></v-spacer>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- Dialog thêm bệnh nhân ước lượng -->
   <v-dialog v-model="dialog" class="schedule_dialog">
     <v-card>
       <v-card-title align="center"> Nhập số lượng người khám </v-card-title>
@@ -119,7 +224,7 @@
                     v-bind="props"
                     color="primary"
                     style="margin-top: -2px"
-                    @click="resetRegisterAdded()"
+                    @click="dialogAcceptReset = true"
                   >
                     mdi-delete-circle-outline
                   </v-icon>
@@ -151,7 +256,9 @@
   <v-dialog v-model="dialogCreatePakageSchedule" class="schedule_dialog">
     <v-card>
       <v-card-title align="center">
-        Xác nhận thêm lịch khám của gói&nbsp;<b>{{ store.data.packageAdd.name }}</b
+        Xác nhận thêm lịch khám của gói&nbsp;<b>{{
+          store.data.packageAdd.name
+        }}</b
         >&nbsp;vào dữ liệu?
       </v-card-title>
       <v-card-actions>
@@ -223,6 +330,29 @@
         </v-btn>
         <v-spacer></v-spacer>
         <v-btn color="blue-darken-1" variant="text" @click="acceptUpdatePack()">
+          Xác nhận
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <v-dialog v-model="dialogAcceptReset" width="auto">
+    <v-card>
+      <v-card-text> Xác nhận reset số lượng người khám </v-card-text>
+      <v-card-actions>
+        <v-btn
+          color="blue-darken-1"
+          variant="text"
+          @click="dialogAcceptReset = false"
+        >
+          Đóng
+        </v-btn>
+        <v-spacer></v-spacer>
+        <v-btn
+          color="blue-darken-1"
+          variant="text"
+          @click="resetRegisterAdded()"
+        >
           Xác nhận
         </v-btn>
       </v-card-actions>
@@ -300,19 +430,29 @@ let old_available_patients = ref(
     : store.value.data.packageAdd?.number_of_employees
 );
 
+let limitSlot = ref(0);
+
 // các biến hiển thị tính toán
 let register_patients_add = ref(0);
 let register_patients = ref(0);
+let slot_registered_seen = ref(0);
+let session_choosed = ref("");
+let date_selected = ref("");
 
 // dialog
 let dialog = ref(false);
 let dialogImport = ref(false);
 let dialogUpdate = ref(false);
 let dialogCreatePakageSchedule = ref(false);
+let dialogUpdateLimitSlot = ref(false);
+let dialogAcceptReset = ref(false);
+let dialogDeleteSession = ref(false);
+let dialogWarningHavePerson = ref(false);
 
 let selectedFileName = ref(null);
 const id = ref(10);
 const tempSessionPack = ref({});
+
 const calendarOptions = {
   plugins: [dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin],
   initialView: "dayGridMonth",
@@ -352,11 +492,13 @@ const calendarOptions = {
   },
   eventClick: (arg) => {
     console.log(new Date());
-    console.log("arg eventClick before", arg);
-    console.log("arg eventClick after", arg.event._def.title);
+    console.log("arg eventClick before", arg?.event?._def?.extendedProps);
+    // console.log("arg eventClick after", arg.event._def.title);
     // console.log(arg.event._def.ui.backgroundColor);
     tempSessionPack.value.appointment_session_id =
       arg.event?._def?.extendedProps?.appointment_session_id;
+    tempSessionPack.value.appointment_schedule_id =
+      arg.event?._def?.extendedProps?.appointment_schedule_id;
     if (
       store.value.state.isCreatePackage ||
       arg?.event?._def?.extendedProps?.state === "edit_pack"
@@ -408,13 +550,60 @@ const calendarOptions = {
         console.log(`hết slot`);
       }
     } else if (arg?.event?._def?.extendedProps?.state === "seen") {
-      console.log("giao diện chỉ xem");
+      console.log("giao diện chỉ xem", arg?.event?._instance?.range?.start);
+      if (
+        arg.event._def.extendedProps?.id ||
+        arg.event._def.extendedProps?.id === 0
+      ) {
+        const dateObject = new Date(arg?.event?._instance?.range?.start);
+
+        // Lấy các thành phần của ngày tháng
+        const year = dateObject.getFullYear();
+        const month = (dateObject.getMonth() + 1).toString().padStart(2, "0"); // Tháng bắt đầu từ 0, nên cần cộng thêm 1
+        const day = dateObject.getDate().toString().padStart(2, "0");
+
+        // Tạo chuỗi ngày tháng mới theo định dạng yyyy-mm-dd
+        date_selected.value = `${day}-${month}-${year}`;
+
+        tempEventEdit_id.value = arg.event._def.extendedProps.id;
+        limitSlot.value =
+          store.value.data.scheduleEvents[
+            tempEventEdit_id.value
+          ]?.extendedProps.session_slot;
+        console.log(
+          `store.value.data.scheduleEvents[
+            tempEventEdit_id.value
+          ]?.extendedProps.session_slot`,
+          store.value.data.scheduleEvents[tempEventEdit_id.value]?.extendedProps
+            .session_slot
+        );
+        slot_registered_seen.value =
+          store.value.data.scheduleEvents[
+            tempEventEdit_id.value
+          ]?.extendedProps.slot_registered;
+        if (
+          store.value.data.scheduleEvents[tempEventEdit_id.value].extendedProps
+            ?.session_name
+        ) {
+          const sessionName =
+            store.value.data.scheduleEvents[tempEventEdit_id.value]
+              .extendedProps?.session_name;
+          session_choosed.value = `(Ngày: ${
+            date_selected.value
+          } | Ca ${sessionName} | ${
+            store.value.data.shift[Number(sessionName) - 1].time
+          })`;
+        }
+
+        console.log("tempEventEdit_id.value", tempEventEdit_id.value);
+        dialogUpdateLimitSlot.value = true;
+      }
     } else {
       console.log("giao diện số lượng khám thực");
     }
   },
   events:
-    store.value.data.scheduleEvents !== []
+    store.value.data.scheduleEvents?.length !== 0
       ? store.value.data.scheduleEvents
       : tempEvent_.value,
 };
@@ -435,9 +624,22 @@ const slotRegisteredRules = ref([
 // =====watch
 // ---Kiểm tra thay đổi số lượng bệnh nhân đăng ký
 
+watch(limitSlot, (newValue, oldValue) => {
+  checkSlot(newValue, oldValue);
+  if (
+    limitSlot.value < slot_registered_seen.value ||
+    !Number.isInteger(Number(limitSlot.value))
+  ) {
+    limitSlot.value = slot_registered_seen.value;
+  } else if (Number(newValue[0]) === 0) {
+    limitSlot.value = Number(limitSlot.value);
+  }
+});
+
 watch(register_patients, (newValue, oldValue) => {
   checkSlot(newValue, oldValue);
 });
+
 watch(register_patients_add, (newValue, oldValue) => {
   console.log("change register_patients_add");
   // if (store.value.state.isEditPackage) {
@@ -459,11 +661,11 @@ watch(dialogUpdate, async (newValue, oldValue) => {
 
 watch(dialog, async (newValue, oldValue) => {
   console.log("✨change dialog");
-  console.log("isBigerEmptySlot", isBigerEmptySlot);
-  console.log("register_patients.value before", register_patients.value);
+  // console.log("isBigerEmptySlot", isBigerEmptySlot);
+  // console.log("register_patients.value before", register_patients.value);
   if (newValue === false) {
     register_patients.value = 0;
-    console.log("register_patients.value", register_patients.value);
+    // console.log("register_patients.value", register_patients.value);
     available_patients.value = old_available_patients.value;
     const session_slot = Number(
       store.value.data.scheduleEvents[tempEventEdit_id.value]?.extendedProps
@@ -479,12 +681,84 @@ watch(dialog, async (newValue, oldValue) => {
 });
 
 let fileInput = ref(null);
+
+// method
+
+const confirmDeleteSession = async () => {
+  try {
+    if (slot_registered_seen.value > 0) {
+      dialogWarningHavePerson.value = true;
+    } else {
+      // Chạy circle load
+      store.value.state.single_progress_circular.icon = "mdi-calendar-range";
+      store.value.state.single_progress_circular.title = "Đang cập nhật...";
+      store.value.state.single_progress_circular.state = true;
+      const headers = {
+        authentication: localStorage.getItem("loginToken")
+          ? localStorage.getItem("loginToken")
+          : "",
+      };
+      const tempPackID =
+        store.value.data.scheduleEvents[tempEventEdit_id.value].extendedProps
+          ?.appointment_session_id;
+      const tempPackDateID =
+        store.value.data.scheduleEvents[tempEventEdit_id.value].extendedProps
+          ?.appointment_schedule_id;
+      await axios
+        .post(`${useRuntimeConfig().public.DOMAIN}/delete-session`, {
+          headers,
+          session_pack_id: tempPackID ? tempPackID : -1,
+          schedule_pack_id: tempPackDateID ? tempPackDateID : -1,
+        })
+        .then(async (response) => {
+          if (response?.data) {
+            console.log("response?.data", response?.data);
+            // if (
+            //   response?.data?.delete_his_ace_appointment_session?.returning[0]?.id
+            // ) {
+            console.log("Xóa bệnh nhân thành công", response.data);
+
+            store.value.state.snackbar = store.value.state.snackbar_default;
+            store.value.state.snackbar.text = "Xóa buổi khám thành công!";
+            store.value.state.snackbar.timeout = 3500;
+            store.value.state.snackbar.state = true;
+            // await fetchSchedule();
+            dialogDeleteSession.value = false;
+            window.location.reload();
+            // }
+          } else {
+            store.value.state.snackbar = store.value.state.snackbar_default;
+            store.value.state.snackbar.text = "Xóa buổi khám không thành công!";
+            store.value.state.snackbar.timeout = 3500;
+            store.value.state.snackbar.state = true;
+            console.log("không có id patient update");
+            dialogDeleteSession.value = false;
+          }
+        })
+        .catch((error) => {
+          // Handle errors
+          console.error("Error:", error);
+          store.value.state.snackbar.text =
+            "Lỗi khi xóa vào danh sách lịch hẹn";
+          store.value.state.snackbar.timeout = 4500;
+          store.value.state.snackbar.state = true;
+        });
+    }
+  } catch (error) {
+    console.log("Có vấn đề", error);
+  }
+  // Đóng circle load
+  store.value.state.single_progress_circular.state = false;
+  store.value.state.single_progress_circular.icon = "";
+  store.value.state.single_progress_circular.title = "";
+};
 const triggerFileInput = () => {
-  console.log(fileInput.value);
   fileInput.value.click();
 };
 const schedule_insert_ = ref([]);
 const handleFileChange = (event) => {
+  console.log("change file");
+
   const file = event.target.files[0];
 
   if (
@@ -517,32 +791,201 @@ const handleFileChange = (event) => {
               data: [],
             },
           };
-          if (sheetData[index]["Date"]) {
-            tempSchedule.date = sheetData[index]["Date"];
+          if (sheetData[index]["Date(dd/mm/yyyy)"]) {
+            if (
+              Number.isInteger(Number(sheetData[index]["Date(dd/mm/yyyy)"]))
+            ) {
+              const dmy = filtersStore.value.excelSerialToDate(
+                Number(sheetData[index]["Date(dd/mm/yyyy)"])
+              );
+              console.log(dmy);
+              console.log(dmy.getFullYear());
+              console.log(dmy.getMonth() + 1);
+              console.log(dmy.getDate());
+              const dd = dmy.getDate();
+              const mm = dmy.getMonth() + 1;
+              const yyyy = dmy.getFullYear();
+
+              // Tạo đối tượng Date từ chuỗi ngày "dd/mm/yyyy"
+              const inputDate = new Date(yyyy, mm - 1, dd);
+
+              // Tạo ngày hiện tại và cộng thêm 3 ngày
+              const currentDate = new Date();
+              currentDate.setDate(currentDate.getDate() + 3); // Cộng thêm 3 ngày
+
+              // So sánh 2 ngày (inputDate và currentDate)
+              if (inputDate >= currentDate) {
+                console.log(
+                  "Input date is later or than the same as the current date + 3 days"
+                );
+                tempSchedule.date = `${dd}/${mm}/${yyyy}`;
+                console.log("tempSchedule.date", tempSchedule.date);
+              } else if (inputDate < currentDate) {
+                console.log(
+                  "Input date is earlier than the current date + 3 days"
+                );
+                console.log("inputDate", inputDate);
+                console.log("currentDate", currentDate);
+
+                store.value.state.snackbar = store.value.state.snackbar_default;
+                store.value.state.snackbar.text =
+                  "Thời điểm phải hơn hơn hoặc bằng ngày hiện tại + 3 ngày";
+                store.value.state.snackbar.timeout = 4500;
+                store.value.state.snackbar.state = true;
+
+                fileInput.value.value = null;
+                return false;
+              } else {
+                console.log("Order from inputdate");
+                store.value.state.snackbar = store.value.state.snackbar_default;
+                store.value.state.snackbar.text =
+                  "Thêm vào danh sách lịch hẹn không thành công";
+                store.value.state.snackbar.timeout = 4500;
+                store.value.state.snackbar.state = true;
+
+                fileInput.value.value = null;
+                return false;
+              }
+            } else {
+              const [day, month, year] = sheetData[index]["Date(dd/mm/yyyy)"]
+                .split("/")
+                .map(Number);
+
+              // Tạo đối tượng Date từ chuỗi ngày "dd/mm/yyyy"
+              const inputDate = new Date(year, month - 1, day);
+
+              // Tạo ngày hiện tại và cộng thêm 3 ngày
+              const currentDate = new Date();
+              currentDate.setDate(currentDate.getDate() + 3); // Cộng thêm 3 ngày
+
+              // So sánh 2 ngày (inputDate và currentDate)
+              if (inputDate >= currentDate) {
+                console.log(
+                  "Input date is later or than the same as the current date + 3 days"
+                );
+                tempSchedule.date = sheetData[index]["Date(dd/mm/yyyy)"];
+              } else if (inputDate < currentDate) {
+                console.log(
+                  "Input date is earlier than the current date + 3 days"
+                );
+                store.value.state.snackbar = store.value.state.snackbar_default;
+                store.value.state.snackbar.text =
+                  "Thời điểm phải hơn hơn hoặc bằng ngày hiện tại + 3 ngày";
+                store.value.state.snackbar.timeout = 4500;
+                store.value.state.snackbar.state = true;
+
+                fileInput.value.value = null;
+                return false;
+              } else {
+                console.log("Order from inputdate");
+                store.value.state.snackbar = store.value.state.snackbar_default;
+                store.value.state.snackbar.text =
+                  "Thêm vào danh sách lịch hẹn không thành công";
+                store.value.state.snackbar.timeout = 4500;
+                store.value.state.snackbar.state = true;
+
+                fileInput.value.value = null;
+                return false;
+              }
+            }
           }
-          if (sheetData[index]["7:30 am - 9:00 am"]) {
+
+          // Kiểm tra điều kiện Ca 1
+          if (
+            sheetData[index]["7:30 am - 9:00 am"] &&
+            Number.isInteger(Number(sheetData[index]["7:30 am - 9:00 am"])) &&
+            Number(sheetData[index]["7:30 am - 9:00 am"]) > 0
+          ) {
             tempSchedule.appointment_sessions.data.push({
               name: "1",
               total_slot: sheetData[index]["7:30 am - 9:00 am"],
             });
+          } else if (
+            sheetData[index]["7:30 am - 9:00 am"] &&
+            (!Number.isInteger(Number(sheetData[index]["7:30 am - 9:00 am"])) ||
+              Number(sheetData[index]["7:30 am - 9:00 am"]) < 0)
+          ) {
+            store.value.state.snackbar = store.value.state.snackbar_default;
+            store.value.state.snackbar.text = `Giới hạn người khám Ca 1 ngày ${tempSchedule.date} phải là số và lớn hơn 0!`;
+            store.value.state.snackbar.timeout = 4500;
+            store.value.state.snackbar.state = true;
+
+            fileInput.value.value = null;
+            return false;
           }
-          if (sheetData[index]["9:00 am - 10:30 am"]) {
+
+          // Kiểm tra điều kiện Ca 2
+          if (
+            sheetData[index]["9:00 am - 10:30 am"] &&
+            Number.isInteger(Number(sheetData[index]["9:00 am - 10:30 am"])) &&
+            Number(sheetData[index]["9:00 am - 10:30 am"]) > 0
+          ) {
             tempSchedule.appointment_sessions.data.push({
               name: "2",
               total_slot: sheetData[index]["9:00 am - 10:30 am"],
             });
+          } else if (
+            sheetData[index]["9:00 am - 10:30 am"] &&
+            (!Number.isInteger(
+              Number(sheetData[index]["9:00 am - 10:30 am"])
+            ) ||
+              Number(sheetData[index]["9:00 am - 10:30 am"]) < 0)
+          ) {
+            store.value.state.snackbar = store.value.state.snackbar_default;
+            store.value.state.snackbar.text = `Giới hạn người khám Ca 2 ngày ${tempSchedule.date} phải là số và lớn hơn 0!`;
+            store.value.state.snackbar.timeout = 4500;
+            store.value.state.snackbar.state = true;
+
+            fileInput.value.value = null;
+            return false;
           }
-          if (sheetData[index]["1:00 pm - 2:00 pm"]) {
+
+          // Kiểm tra điều kiện Ca 3
+          if (
+            sheetData[index]["1:00 pm - 2:00 pm"] &&
+            Number.isInteger(Number(sheetData[index]["1:00 pm - 2:00 pm"])) &&
+            Number(sheetData[index]["1:00 pm - 2:00 pm"]) > 0
+          ) {
             tempSchedule.appointment_sessions.data.push({
               name: "3",
               total_slot: sheetData[index]["1:00 pm - 2:00 pm"],
             });
+          } else if (
+            sheetData[index]["1:00 pm - 2:00 pm"] &&
+            (!Number.isInteger(Number(sheetData[index]["1:00 pm - 2:00 pm"])) ||
+              Number(sheetData[index]["1:00 pm - 2:00 pm"]) < 0)
+          ) {
+            store.value.state.snackbar = store.value.state.snackbar_default;
+            store.value.state.snackbar.text = `Giới hạn người khám Ca 3 ngày ${tempSchedule.date} phải là số và lớn hơn 0!`;
+            store.value.state.snackbar.timeout = 4500;
+            store.value.state.snackbar.state = true;
+
+            fileInput.value.value = null;
+            return false;
           }
-          if (sheetData[index]["2:00 pm - 3:30 pm"]) {
+
+          // Kiểm tra điều kiện Ca 4
+          if (
+            sheetData[index]["2:00 pm - 3:30 pm"] &&
+            Number.isInteger(Number(sheetData[index]["2:00 pm - 3:30 pm"])) &&
+            Number(sheetData[index]["2:00 pm - 3:30 pm"]) > 0
+          ) {
             tempSchedule.appointment_sessions.data.push({
               name: "4",
               total_slot: sheetData[index]["2:00 pm - 3:30 pm"],
             });
+          } else if (
+            sheetData[index]["2:00 pm - 3:30 pm"] &&
+            (!Number.isInteger(Number(sheetData[index]["2:00 pm - 3:30 pm"])) ||
+              Number(sheetData[index]["2:00 pm - 3:30 pm"]) < 0)
+          ) {
+            store.value.state.snackbar = store.value.state.snackbar_default;
+            store.value.state.snackbar.text = `Giới hạn người khám Ca 3 ngày ${tempSchedule.date} phải là số và lớn hơn 0!`;
+            store.value.state.snackbar.timeout = 4500;
+            store.value.state.snackbar.state = true;
+
+            fileInput.value.value = null;
+            return false;
           }
           schedule_insert_.value.push(tempSchedule);
         }
@@ -690,21 +1133,26 @@ function resetRegisterAdded() {
   ].extendedProps.slot_registered -= register_patients_add.value;
 
   // rút gọn tên biến
-  const session_name =
-    store.value.data.scheduleEvents[tempEventEdit_id.value].extendedProps
-      .session_name;
+  const session_name = store.value.data.scheduleEvents[tempEventEdit_id.value]
+    .extendedProps.session_name
+    ? store.value.data.scheduleEvents[tempEventEdit_id.value].extendedProps
+        .session_name
+    : 1;
+  console.log("session_name", session_name);
   const session_slot =
     store.value.data.scheduleEvents[tempEventEdit_id.value].extendedProps
       .session_slot;
+  console.log("session_slot", session_slot);
   const slot_registered =
     store.value.data.scheduleEvents[tempEventEdit_id.value].extendedProps
       .slot_registered;
+  console.log("slot_registered", slot_registered);
 
   // cập nhật giá trị buổi
   store.value.data.scheduleEvents[
     tempEventEdit_id.value
   ].title = `Ca ${session_name}\t|\t${
-    this.store.data.shift[Number(session_name) - 1].time
+    store.value.data.shift[Number(session_name) - 1].time
   }\t|\t${slot_registered}/${session_slot}`;
 
   store.value.data.scheduleEvents[tempEventEdit_id.value].backgroundColor =
@@ -738,6 +1186,11 @@ function resetRegisterAdded() {
     );
   }
   console.log(store.value.data.packageAdd.session_packs);
+  store.value.state.snackbar.text = "Đã reset số lượng người khám";
+  store.value.state.snackbar.timeout = 4500;
+  store.value.state.snackbar.state = true;
+  dialogAcceptReset.value = false;
+  dialog.value = false;
 }
 
 const findTempDeleteSessionPack = (session_id) => {
@@ -933,6 +1386,62 @@ const save = async () => {
   }
 };
 
+const updateLimitSlot = async () => {
+  console.log("updateLimitSlot");
+  try {
+    // Chạy circle load
+    store.value.state.single_progress_circular.icon = "mdi-calendar-range";
+    store.value.state.single_progress_circular.title = "Đang cập nhật...";
+    store.value.state.single_progress_circular.state = true;
+
+    const headers = {
+      authentication: localStorage.getItem("loginToken")
+        ? localStorage.getItem("loginToken")
+        : "",
+    };
+    await axios
+      .post(`${useRuntimeConfig().public.DOMAIN}/update-session-limit`, {
+        headers,
+        appointment_session_id:
+          store.value.data.scheduleEvents[tempEventEdit_id.value]?.extendedProps
+            ?.appointment_session_id,
+        total_slot: limitSlot.value,
+      })
+      .then(async (response) => {
+        if (response?.data) {
+          if (
+            response?.data?.update_his_ace_appointment_session?.returning[0]?.id
+          ) {
+            console.log("update bệnh nhân thành công", response.data);
+
+            store.value.state.snackbar = store.value.state.snackbar_default;
+            store.value.state.snackbar.text = "Cập nhật buổi khám thành công!";
+            store.value.state.snackbar.timeout = 3500;
+            store.value.state.snackbar.state = true;
+          } else {
+            store.value.state.snackbar = store.value.state.snackbar_default;
+            store.value.state.snackbar.text =
+              "Cập nhật buổi khám không thành công!";
+            store.value.state.snackbar.timeout = 3500;
+            store.value.state.snackbar.state = true;
+            console.log("không có id patient update");
+          }
+          dialogUpdateLimitSlot.value = false;
+          await fetchSchedule();
+          window.location.reload();
+        }
+      })
+      .catch((e) => {
+        console.log("không có data update", e);
+      });
+  } catch (error) {
+    console.log("error", error);
+  }
+  // Đóng circle load
+  store.value.state.single_progress_circular.state = false;
+  store.value.state.single_progress_circular.icon = "";
+  store.value.state.single_progress_circular.title = "";
+};
 // fetch lịch
 const fetchSchedule = async () => {
   try {
@@ -981,15 +1490,25 @@ const fetchSchedule = async () => {
                   end: null,
                   extendedProps: {
                     appointment_session_id: null,
+                    appointment_schedule_id: null,
                   },
                   backgroundColor: "#00407e",
                 };
                 tempEvent.date = appointmentSchedules[index].date;
+                tempEvent.extendedProps.appointment_schedule_id =
+                  appointmentSchedules[index].date;
                 tempEvent.extendedProps.appointment_session_id =
                   cloneSessions[j].id;
+                const session_name =
+                  store.value.data.scheduleEvents[tempEventEdit_id.value]
+                    .extendedProps.session_name;
                 if (cloneSessions[j].name) {
-                  tempEvent.title = `Ca ${j + 1} | ${
-                    this.store.data.shift[j].time
+                  tempEvent.title = `Ca ${session_name} | ${
+                    this.store.value.data.shift[
+                      Number.isInteger(Number(session_name))
+                        ? Number(session_name)
+                        : 1
+                    ].time
                   } \t|\t `;
                 }
                 let totalSlots = 0;
@@ -1028,6 +1547,7 @@ const fetchSchedule = async () => {
 </script>
 <style scoped>
 .btn_add_schedule {
+  font-weight: bold;
   background: linear-gradient(to left, #c1cbd1, transparent, #c1cbd1);
 }
 .schedule_dialog {

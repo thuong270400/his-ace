@@ -435,6 +435,7 @@ export default {
         sortable: false,
         title: "STT",
       },
+      { key: "company.name", title: "Tên công ty" },
       { key: "name", title: "Tên gói khám" },
       { key: "number_of_employees", title: "Số lượng người tham gia" },
       { key: "price", title: "Giá gói khám" },

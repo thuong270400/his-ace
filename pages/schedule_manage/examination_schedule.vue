@@ -104,6 +104,8 @@ export default defineComponent({
             }
             if (appointmentSchedules?.length > 0) {
               this.store.data.scheduleEvents = [];
+
+              let index_session = 0;
               for (
                 let index = 0;
                 index < appointmentSchedules.length;
@@ -124,7 +126,11 @@ export default defineComponent({
                       start: null,
                       end: null,
                       extendedProps: {
+                        id: index_session++,
                         appointment_session_id: null,
+                        session_name: null,
+                        session_slot: null,
+                        slot_registered: null,
                         state: "seen",
                       },
                       backgroundColor: "#00407e",
@@ -142,12 +148,20 @@ export default defineComponent({
                     //   // tempEvent.end = "9";
                     // }
                     tempEvent.date = appointmentSchedules[index].date;
+                    tempEvent.extendedProps.appointment_schedule_id =
+                      appointmentSchedules[index].id;
                     tempEvent.extendedProps.appointment_session_id =
                       cloneSessions[j].id;
                     if (cloneSessions[j].name) {
-                      tempEvent.title = `Ca ${j + 1}\t|\t${
-                        this.store.data.shift[j].time
+                      console.log(
+                        Number.isInteger(Number(cloneSessions[j].name))
+                      );
+                      tempEvent.title = `Ca ${cloneSessions[j].name}\t|\t${
+                        this.store.data.shift[Number(cloneSessions[j].name) - 1]
+                          .time
                       }\t|\t`;
+                      tempEvent.extendedProps.session_name =
+                        cloneSessions[j].name;
                     }
 
                     let totalSlots = 0;
@@ -158,11 +172,14 @@ export default defineComponent({
                         totalSlots += Number(companyPacks[k].total_slot);
                       }
                       tempEvent.title += `\t${totalSlots}`;
+                      tempEvent.extendedProps.slot_registered = totalSlots;
                     } else {
                       tempEvent.title += `\t0`;
+                      tempEvent.extendedProps.session_slot = 0;
                     }
                     tempEvent.title += `/${cloneSessions[j].total_slot}`;
-
+                    tempEvent.extendedProps.session_slot =
+                      cloneSessions[j].total_slot;
                     if (totalSlots === Number(cloneSessions[j].total_slot)) {
                       tempEvent.backgroundColor = "red";
                     }

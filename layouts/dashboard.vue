@@ -17,8 +17,8 @@
               align-tabs="center"
             >
               <v-tab
-                v-for="item in layout.app_bar.items"
-                :key="item.id"
+                v-for="(item, i) in layout.app_bar.items"
+                :key="i"
                 :value="item.id"
                 @click="getListNavDraw(item), (drawer = true)"
                 >{{ item.title }}</v-tab
@@ -35,8 +35,8 @@
     <v-navigation-drawer v-model="drawer" class="app-bar" permanent>
       <v-list color="transparent">
         <NuxtLink
-          v-for="item in layout.nav_draw_now.items"
-          :key="item.id"
+          v-for="(item, i) in layout.nav_draw_now.items"
+          :key="i"
           :to="item.path"
           class="link_style"
         >
@@ -63,14 +63,20 @@
       </v-card>
     </v-main>
   </v-card>
+  <Snackbar />
 </template>
 
 <script>
 import axios from "axios";
 import { useFiltersStore } from "~/store/index.ts";
 import { storeToRefs } from "pinia";
+import Snackbar from "~/components/utilities/Snackbar.vue";
 export default {
   name: "DashboardLayout",
+
+  components: {
+    Snackbar,
+  },
   data() {
     return {
       store: storeToRefs(useFiltersStore()),
@@ -105,7 +111,7 @@ export default {
               id: 4,
               icon: null,
               title: "Báo cáo",
-              permission: ["admin"],
+              permission: ["admin", "LH", "KD"],
             },
           ],
         },
@@ -117,6 +123,14 @@ export default {
               title: "Dashboard",
               path: "/",
               app_bar_id: 1,
+            },
+            {
+              id: "dongbo_pd",
+              icon: "mdi-sync-circle",
+              title: "Đồng bộ thủ công",
+              path: "/manual_sync",
+              app_bar_id: 1,
+              permission: ["admin"],
             },
             {
               id: 2,
@@ -160,10 +174,10 @@ export default {
             {
               id: 7,
               icon: "mdi-file-export",
-              title: "Báo cáo trong ngày",
-              path: "/",
+              title: "Báo cáo theo ngày",
+              path: "/reports/appointment_report",
               app_bar_id: 4,
-              permission: ["admin"],
+              permission: ["admin", "LH", "KD"],
             },
           ],
         },
@@ -189,6 +203,12 @@ export default {
     await this.fetchLogin();
     await this.filtersStore.fetchUser();
     this.fetListAppBar();
+    this.getListNavDraw({
+      id: 1,
+      icon: null,
+      title: "Trang chủ",
+      permission: ["admin", "LH", "KD", "KH"],
+    });
   },
   methods: {
     async fetchLogin() {
