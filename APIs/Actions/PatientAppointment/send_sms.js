@@ -87,11 +87,13 @@ module.exports = async function (req, res) {
             dateToCompare = new Date(dateString);
 
             dateToCompare.setDate(dateToCompare.getDate() - 4);
+            const dateToCompare_with_today = new Date(dateString);
+            dateToCompare_with_today.setDate(dateToCompare.getDate() + 1);
             // Lấy ngày hiện tại
             const today = new Date();
 
             // So sánh ngày hiện tại với biến ngày
-            if (today < dateToCompare.getDate() + 1) {
+            if (today < dateToCompare_with_today) {
               // Nếu ngày hiện tại bé hơn biến ngày, tính hiệu của hai ngày và lấy giá trị tuyệt đối
               const differenceInTime = Math.abs(dateToCompare.getTime() - today.getTime());
               // Chuyển đổi kết quả thành số ngày (tính theo milliseconds)
@@ -132,80 +134,111 @@ module.exports = async function (req, res) {
         is_saved_link = true;
 
         let isSMSSent = false;
+
+        // sms zalo
         await delay(2000);
         try {
+          console.log('Bắt đầu gửi zalo!');
+
           const results = await axios.post(
-            `http://rest.esms.vn/MainService.svc/json/SendMultipleMessage_V4_post_json/`,
+            `http://rest.esms.vn/MainService.svc/json/SendZaloMessage_V4_post_json/`,
             {
-              Content: `Lịch khám tại DKQTSG như sau:\n` +
-                `Your health check-up appointment at SIGC: \n` +
-                `Ngày khám/ Date : ${bodyReq.date ? bodyReq.date : 'Chưa đặt lịch'}\n` +
-                `Giờ khám/ Time : ${bodyReq.shift ? bodyReq.shift : 'Chưa đặt lịch'}\n` +
-                `Nếu muốn thay đổi thông tin, xin vui lòng truy cập link:\n` +
-                `If you wish to change this info, please access the link:\n` +
-                `${process.env.DOMAIN_SERVER}/${shortUrl}\n` +
-                `${dateToCompare ? `Hạn chót điều chỉnh/ Last editable day : ${dateToCompare.getDate()}-${dateToCompare.getMonth() + 1}-${dateToCompare.getFullYear()}.\n` : ''}` +
-                `Xin cảm ơn quý khách.\n` +
-                `Thanks for your time.`,
-              Phone: phone_number,
               ApiKey: "C671FB9BF15391FA5FFC62A3AC9A34",
               SecretKey: "D3C47022E82732DD589C9E2AC56742",
-              Brandname: "DKQT.SAIGON",
-              SmsType: "2",
-              IsUnicode: 1,
+              Phone: phone_number,
+              Params: ['abc', "Nguyễn Văn A", "11/11/2024", 'Bác Sĩ A', 'Khoa Răng Hàm Mặt', "Trịnh Văn Cấn"],
+              TempID: "213250",
+              OAID: "161124468397603457",
               Sandbox: 0,
-              campaignid: "abc",
-              RequestId: `${request_id}${generateRandomString(6)}`,
-              //    "CallbackUrl": "CallbackUrl"
+              RequestId: `${request_id}${generateRandomString(6)}zalo`,
+              campaignid: "zalodkqtsg",
+              CallbackUrl: 'http://localhost:8082/result-zalo'
             }
           );
           if (results) {
-            console.log("results", results?.headers?.date ? results.headers.date : '');
+            console.log("results zalo", results);
             isSMSSent = true;
+            response.zns_now = true
+            response.short_url = `${process.env.DOMAIN_SERVER}/${shortUrl}`
           } else {
             console.log("false");
           }
           // thực hiện gửi sms delay tại đây
-          response.sms_now = true
-          response.short_url = `${process.env.DOMAIN_SERVER}/${shortUrl}`
-
         } catch (error) {
           console.log("error in send sms", error);
         }
 
-
-
-        // sms zalo
-        // await delay(3000);
+        // await delay(2000);
         // try {
         //   const results = await axios.post(
-        //     `http://rest.esms.vn/MainService.svc/json/SendZaloMessage_V4_post_json/`,
+        //     `http://rest.esms.vn/MainService.svc/json/SendMultipleMessage_V4_post_json/`,
         //     {
+        //       Content: `Lịch khám tại DKQTSG:\n` +
+        //         `Your health check-up appointment at SIGC:\n` +
+        //         `Ngày khám/ Date: ${bodyReq.date ? bodyReq.date : 'Chưa đặt lịch'}\n` +
+        //         `Giờ khám/ Time: ${bodyReq.shift ? bodyReq.shift : 'Chưa đặt lịch'}\n` +
+        //         `Nếu muốn thay đổi thông tin, xin vui lòng truy cập link:\n` +
+        //         `If you wish to change this info, please access the link:\n` +
+        //         `${process.env.DOMAIN_SERVER}/${shortUrl} .\n` +
+        //         // `${dateToCompare ? `Hạn chót điều chỉnh/ Last editable day: 07-11-3000.\n` : ''}` +
+        //         `${dateToCompare ? `Hạn chót điều chỉnh/ Last editable day: ${dateToCompare.getDate()}-${dateToCompare.getMonth() + 1}-${dateToCompare.getFullYear()}.\n` : ''}` +
+        //         `Xin cảm ơn quý khách.\n` +
+        //         `Thanks for your time.`,
         //       Phone: phone_number,
-        //       ApiKey: "D9BD6DCF55BD80C56F974C3BD2DA2D",
-        //       SecretKey: "9F904FCAE60C129DA62293D30172F3",
-        //       Params: ["customer_name", "order_code", "address", phone_number, "email", "product_name", "3", "100000", `15/05/2024`],
-        //       TempID: "200607",
-        //       OAID: "4097311281936189049",
+        //       ApiKey: "C671FB9BF15391FA5FFC62A3AC9A34",
+        //       SecretKey: "D3C47022E82732DD589C9E2AC56742",
+        //       Brandname: "DKQT.SAIGON",
+        //       SmsType: "2",
+        //       IsUnicode: 1,
         //       Sandbox: 0,
-        //       RequestId: request_id,
         //       campaignid: "abc",
+        //       RequestId: `${request_id}${generateRandomString(6)}`,
+        //       //    "CallbackUrl": "CallbackUrl"
         //     }
         //   );
         //   if (results) {
-        //     console.log("results", results);
+        //     console.log("results", results?.headers?.date ? results.headers.date : '');
         //     isSMSSent = true;
-        //     response.zns_now = true
-        //     response.short_url = `${process.env.DOMAIN_SERVER}/${shortUrl}`
+        //     const updateIsSent = gql`
+        //       mutation MyMutation {
+        //         update_his_ace_patients(where: {id: {_eq: "${request_id}"}}, _set: {is_mess_sent: 1}) {
+        //           affected_rows
+        //           returning {
+        //             id
+        //           }
+        //         }
+        //       }
+        //     `;
+        //     // console.log('insert his_ace_shortlinks_insert_input', updateIsSent);
+        //     const variables = {
+        //     };
+        //     await request(endpoint, updateIsSent, variables, headers)
+        //       .then(async function (data) {
+        //         console.log(data)
+        //         // kiểm tra có dữ liệu đã insert hay không
+        //         if (data.update_his_ace_patients?.affected_rows) {
+        //           console.log('Đã cập nhật trạng thái đã gửi!');
+        //         } else {
+        //           console.log('Cập nhật trạng thái đã gửi không thành công!');
+        //         }
+        //       })
+        //       .catch(error => {
+        //         console.error(error)
+        //         console.log('Lỗi cập nhật trạng thái gửi tin nhắn!');
+        //         res.json({ success: isSMSSent, updateStatus: false });
+        //       });
         //   } else {
         //     console.log("false");
         //   }
         //   // thực hiện gửi sms delay tại đây
+        //   response.sms_now = true
+        //   response.short_url = `${process.env.DOMAIN_SERVER}/${shortUrl}`
+
         // } catch (error) {
         //   console.log("error in send sms", error);
         // }
 
-        // check ngày đến hạn
+        // // check ngày đến hạn
 
         // await delay(3000);
         // if (req.body?.date) {

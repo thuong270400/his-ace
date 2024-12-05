@@ -13,6 +13,9 @@ module.exports = function (req, res) {
                 id
                 code
                 company_id
+                company {
+                  name
+                }
                 name
                 number_of_employees
                 price

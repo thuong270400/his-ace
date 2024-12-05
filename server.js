@@ -1,6 +1,8 @@
 const express = require('express');
 const client = require('./ConnectDatabase/his_ace')
+const axios = require('axios');
 const cronSMSPack = require('./APIs/Actions/PatientAppointment/send_sms_due_up')
+const syncHealthCOntract = require('./APIs/PhuongDong/select/company')
 
 const bodyParser = require('body-parser');
 // const twilioConfig = require('./middlewares/twilioConfig');
@@ -8,7 +10,7 @@ const bodyParser = require('body-parser');
 
 // Thư viện rút gọn link
 // const { customAlphabet } = require('nanoid');
-
+const cron = require('node-cron');
 var app = express();
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
@@ -16,7 +18,6 @@ const auth = require('./middlewares/auth')
 const path = require('path');
 const multer = require('multer'); // Import multer for handling multipart/form-data
 const sharp = require('sharp'); // Import sharp for image processing
-const cron = require('node-cron');
 
 const shortid = require('shortid');
 
@@ -54,11 +55,26 @@ app.all('/*', function (req, res, next) {
   next();
 });
 
-// Thiết lập cron job chạy vào mỗi 6h sáng hàng ngày
-cron.schedule('20 11 * * *', () => {
+// Thiết lập cron job chạy gửi sms hẹn khám vào mỗi 11h20 sáng hàng ngày
+cron.schedule('20 11 * * *', async () => {
   // Thực hiện công việc bạn muốn ở đây
-  console.log('Cron job đã được kích hoạt vào 6h sáng hàng ngày!');
-  cronSMSPack()
+  try {
+    console.log('Cron job đã được kích hoạt vào 6h sáng hàng ngày!');
+    await cronSMSPack()
+  }
+  catch (e) {
+    console.log('Gửi SMS hẹn khám thất bại!');
+  }
+});
+
+// cron chạy đồng bộ danh sách gói khám công ty theo ngày
+cron.schedule('10 21 * * *', async () => {
+  try {
+    await syncHealthCOntract()
+    console.log('Response from API:', response.data);
+  } catch (error) {
+    console.error('Error calling API:', error);
+  }
 });
 
 // ==IMAGE==
@@ -269,11 +285,62 @@ app.get('/quick-select-package_ids', auth, require('./APIs/Actions/Other/QuickSe
 //     res.status(404).json({ error: 'Link not found' });
 //   }
 // });
-app.get('/:shortUrl', require('./middlewares/short_url'));
 
 // test
 app.get('/test-api', require('./APIs/Actions/test_api'));
+
+// kết quả gửi tin zalo
+app.get('/result-zalo', require('./APIs/Actions/callback/result_zalo'));
+
+app.post('/result-zalo', require('./APIs/Actions/callback/result_zalo'));
+
+// api test
 app.post('/test-api', require('./APIs/Actions/test_api'));
+
+// ====================OAPI
+// lấy token
+app.post('/oapi-get-token', require('./APIs/OAPI/get_token'));
+
+// select company
+app.post('/oapi-select-company', auth, require('./APIs/OAPI/select/select_company'));
+
+// insert company
+app.post('/oapi-insert-company', auth, require('./APIs/OAPI/insert/insert_company'));
+
+// delete company
+app.post('/oapi-delete-company', auth, require('./APIs/OAPI/delete/delete_company'));
+
+// select pack
+app.post('/oapi-select-pack', auth, require('./APIs/OAPI/select/select_pack'));
+
+// insert pack
+app.post('/oapi-insert-pack', auth, require('./APIs/OAPI/insert/insert_pack'));
+
+// delete pack
+app.post('/oapi-delete-pack', auth, require('./APIs/OAPI/delete/delete_pack'));
+
+// select patient
+app.post('/oapi-select-patients', auth, require('./APIs/OAPI/select/select_patients'));
+
+// insert patient
+app.post('/oapi-insert-patients', auth, require('./APIs/OAPI/insert/insert_patients'));
+
+// delete pack
+app.post('/oapi-delete-patients', auth, require('./APIs/OAPI/delete/delete_patients'));
+
+// delete patient
+// app.post('/oapi-delete-patient', auth, require('./APIs/OAPI/delete/delete_patient'));
+
+// ===============================PHƯƠNG ĐÔNG=============================
+// get company
+app.post('/get-company-pd', auth, require('./APIs/PhuongDong/select/company'));
+
+// lấy danh sách báo cáo dặt hẹn
+app.get('/select-appointment-report', auth, require('./APIs/DataTables/Selects/appointment_report'));
+
+app.get('/select-appointment-report-manager', auth, require('./APIs/DataTables/Selects/manager/appointment_report_manager'));
+
+app.get('/:shortUrl', require('./middlewares/short_url'));
 
 const ipAddress = '192.168.100.117';
 // var server = app.listen(process.env.PORT, ipAddress, function () {

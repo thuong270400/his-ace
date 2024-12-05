@@ -29,6 +29,9 @@ module.exports = function (req, res) {
                       date
                     }
                   }
+                } 
+                company {
+                  name
                 }
               }
             }                       

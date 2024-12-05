@@ -171,15 +171,15 @@ module.exports = async function () {
           const results = await axios.post(
             `http://rest.esms.vn/MainService.svc/json/SendMultipleMessage_V4_post_json/`,
             {
-              Content: `Lịch khám tại DKQTSG như sau:` + '\n' +
-                `Your health check-up appointment at SIGC: ` + '\n' +
-                `Ngày khám/ Date : ${dateAppointment ? DataDateToValDate(dateAppointment) : 'Chưa đặt lịch'}` + '\n' +
-                `Giờ khám/ Time : ${timeAppointment ? timeAppointment : 'Chưa đặt lịch'}\n` +
+              Content: `Lịch khám tại DKQTSG:` + '\n' +
+                `Your health check-up appointment at SIGC:` + '\n' +
+                `Ngày khám/ Date: ${dateAppointment ? DataDateToValDate(dateAppointment) : 'Chưa đặt lịch'}` + '\n' +
+                `Giờ khám/ Time: ${timeAppointment ? timeAppointment : 'Chưa đặt lịch'}\n` +
                 `Nếu muốn thay đổi thông tin, xin vui lòng truy cập link:\n` +
                 `If you wish to change this info, please access the link:\n` +
-                `${process.env.DOMAIN_SERVER}/${shortUrl}\n` +
+                `${process.env.DOMAIN_SERVER}/${shortUrl} .\n` +
                 `${dateToCompare
-                  ? `Hạn chót điều chỉnh/ Last editable day : ${dateToCompare.getDate()}-${dateToCompare.getMonth() + 1}-${dateToCompare.getFullYear()}.\n` : ''}` +
+                  ? `Hạn chót điều chỉnh/ Last editable day: ${dateToCompare.getDate()}-${dateToCompare.getMonth() + 1}-${dateToCompare.getFullYear()}.\n` : ''}` +
                 `Xin cảm ơn quý khách.\n` +
                 `Thanks for your time.`,
               Phone: phone_number,
@@ -197,6 +197,34 @@ module.exports = async function () {
           if (results) {
             console.log("results", results?.headers?.date ? results.headers.date : '');
             isSMSSent = true;
+            const updateIsSent = gql`
+              mutation MyMutation {
+                update_his_ace_patients(where: {id: {_eq: "${request_id}"}}, _set: {is_mess_sent: 1}) {
+                  affected_rows
+                  returning {
+                    id
+                  }
+                }
+              }
+            `;
+            // console.log('insert his_ace_shortlinks_insert_input', updateIsSent);
+            const variables = {
+            };
+            await request(endpoint, updateIsSent, variables, headers)
+              .then(async function (data) {
+                console.log(data)
+                // kiểm tra có dữ liệu đã insert hay không
+                if (data.update_his_ace_patients?.affected_rows) {
+                  console.log('Đã cập nhật trạng thái đã gửi!');
+                } else {
+                  console.log('Cập nhật trạng thái đã gửi không thành công!');
+                }
+              })
+              .catch(error => {
+                console.error(error)
+                console.log('Lỗi cập nhật trạng thái gửi tin nhắn!');
+                res.json({ success: isSMSSent, updateStatus: false });
+              });
           } else {
             console.log("false");
           }
