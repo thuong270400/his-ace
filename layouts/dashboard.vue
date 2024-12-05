@@ -5,13 +5,58 @@
     theme="dark"
   >
     <v-app-bar class="app-bar">
-      <template v-slot:prepend>
+      <!-- <template v-slot:prepend>
         <v-app-bar-nav-icon @click.stop="drawer = !drawer"></v-app-bar-nav-icon>
-      </template>
-      <v-app-bar-title class="app-bar-title">
+      </template> -->
+      <div style="width: 100%">
         <v-row justify="center">
-          <v-col>
-            <v-tabs
+          <v-col style="padding-top: 0">
+            <a-menu
+              v-model:selectedKeys="layout.app_bar.items"
+              mode="horizontal"
+              :default-selected-keys="['table_manage']"
+              :default-open-keys="['company_packages']"
+              class="d-flex align-center justify-center"
+            >
+              <template v-for="menu in filteredMenu">
+                <a-sub-menu
+                  :key="menu.key"
+                  v-if="menu.children && menu.children.length"
+                >
+                  <template #title>
+                    <span>
+                      <a-icon :type="menu.icon" />
+                      <span>{{ menu.label }}</span>
+                    </span>
+                  </template>
+
+                  <!-- Menu Children -->
+                  <a-menu-item v-for="item in menu.children" :key="item.key">
+                    <NuxtLink :to="`/${menu.key}/${item.key}`">
+                      {{ item.label }}
+                    </NuxtLink>
+                  </a-menu-item>
+                  <!-- <NuxtLink
+                    v-for="item in menu.children"
+                    :key="item.key"
+                    :to="`/${menu.key}/${item.key}`"
+                  >
+                    <a-menu-item>
+                      {{ item.label }}
+                    </a-menu-item>
+                  </NuxtLink> -->
+                </a-sub-menu>
+
+                <!-- Menu Item không có children -->
+                <a-menu-item v-else :key="menu.key">
+                  <NuxtLink :to="`/${menu.key}`">
+                    <a-icon :type="menu.icon" />
+                    {{ menu.label }}
+                  </NuxtLink>
+                </a-menu-item>
+              </template>
+            </a-menu>
+            <!-- <v-tabs
               v-model="tab"
               color="light-green-accent-2"
               align-tabs="center"
@@ -23,16 +68,16 @@
                 @click="getListNavDraw(item), (drawer = true)"
                 >{{ item.title }}</v-tab
               >
-            </v-tabs>
+            </v-tabs> -->
           </v-col>
         </v-row>
-      </v-app-bar-title>
-      <v-btn icon>
+      </div>
+      <!-- <v-btn icon>
         <v-icon>mdi-magnify</v-icon>
-      </v-btn>
+      </v-btn> -->
     </v-app-bar>
 
-    <v-navigation-drawer v-model="drawer" class="app-bar" permanent>
+    <!-- <v-navigation-drawer v-model="drawer" class="app-bar" permanent>
       <v-list color="transparent">
         <NuxtLink
           v-for="(item, i) in layout.nav_draw_now.items"
@@ -56,7 +101,7 @@
           <v-btn block @click="logOut()"> Logout </v-btn>
         </div>
       </template>
-    </v-navigation-drawer>
+    </v-navigation-drawer> -->
     <v-main>
       <v-card theme="light" class="pa-2">
         <slot />
@@ -79,6 +124,62 @@ export default {
   },
   data() {
     return {
+      menuConfig: [
+        {
+          key: "manual_sync",
+          label: "Đồng bộ",
+          icon: "manual_sync",
+          roles: ["admin"],
+        },
+        {
+          key: "table_manage",
+          label: "Quản lý khám bệnh",
+          icon: "dashboard",
+          roles: ["admin", "KD", "LH"],
+          children: [
+            {
+              key: "companies",
+              label: "Danh sách công ty",
+              roles: ["admin", "KD"],
+            },
+            {
+              key: "company_packages",
+              label: "Danh sách gói khám",
+              roles: ["admin", "KD", "LH"],
+            },
+            {
+              key: "patients",
+              label: "Danh sách bệnh nhân",
+              roles: ["admin", "KD"],
+            },
+          ],
+        },
+        {
+          key: "schedule_manage",
+          label: "Quản lý lịch khám",
+          icon: "dashboard",
+          roles: ["admin", "LH"],
+          children: [
+            {
+              key: "examination_schedule",
+              label: "Danh sách lịch hẹn",
+              roles: ["admin", "LH"],
+            },
+            {
+              key: "real_examination",
+              label: "Số lượng khám trực",
+              roles: ["admin", "LH"],
+            },
+          ],
+        },
+        {
+          key: "reports/appointment_report",
+          label: "Báo cáo",
+          icon: "dashboard",
+          roles: ["admin", "LH"],
+        },
+      ],
+
       store: storeToRefs(useFiltersStore()),
       filtersStore: useFiltersStore(),
       items: [
@@ -210,6 +311,30 @@ export default {
       permission: ["admin", "LH", "KD", "KH"],
     });
   },
+  computed: {
+    filteredMenu() {
+      const filterMenuByRole = (menu) => {
+        if (
+          !menu.roles ||
+          menu.roles.includes(this.store.data.user.permission)
+        ) {
+          const filteredChildren = menu.children
+            ? menu.children.filter(
+                (child) =>
+                  !child.roles ||
+                  child.roles.includes(this.store.data.user.permission)
+              )
+            : [];
+          return { ...menu, children: filteredChildren };
+        }
+        return null;
+      };
+
+      return this.menuConfig
+        .map(filterMenuByRole)
+        .filter((menu) => menu !== null);
+    },
+  },
   methods: {
     async fetchLogin() {
       this.overlay = true;
@@ -277,7 +402,7 @@ export default {
 .app-bar {
   background-color: rgba(0, 0, 0, 0.3);
   box-shadow: 5px 10px rgba(59, 202, 59, 0) !important;
-  margin-bottom: 2vh;
+  /* margin-bottom: 2vh; */
 }
 .app-bar-title {
   font-weight: bold;
@@ -289,10 +414,6 @@ export default {
 }
 .app-bar-icon {
   display: block;
-}
-.v-toolbar__content,
-.v-toolbar__extension {
-  height: 5vw !important;
 }
 .card_style {
   display: flex;

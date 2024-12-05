@@ -1,5 +1,7 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 import dotenv from 'dotenv';
+import Components from 'unplugin-vue-components/vite';
+import { AntDesignVueResolver } from 'unplugin-vue-components/resolvers';
 
 // Nạp biến môi trường từ tệp .env
 dotenv.config();
@@ -25,9 +27,19 @@ export default defineNuxtConfig({
     define: {
       'process.env.DEBUG': false,
     },
+    plugins: [
+      Components({
+        // add option {resolveIcons: true} as parameter for resolving problem with icons
+        resolvers: [AntDesignVueResolver({resolveIcons: true})],
+      }),
+    ],
+    
+    ssr: {
+      noExternal: ['moment', 'compute-scroll-into-view', 'ant-design-vue','@ant-design/icons-vue'],
+    },  
   },
   modules: [
     // ...
     '@pinia/nuxt',
-  ],
+  ]
 })
